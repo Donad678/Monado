@@ -128,6 +128,7 @@ struct vk_bundle
 	// end of GENERATED instance extension code - do not modify - used by scripts
 
 	// beginning of GENERATED device extension code - do not modify - used by scripts
+	bool has_KHR_buffer_device_address;
 	bool has_KHR_external_fence_fd;
 	bool has_KHR_external_semaphore_fd;
 	bool has_KHR_format_feature_flags2;
@@ -174,6 +175,9 @@ struct vk_bundle
 
 		//! Were device groups requested, available and enabled? (at least one group found)
 		bool use_device_group;
+
+		//! Were buffer device address feature requested, available and enabled?
+		bool buffer_device_address;
 	} features;
 
 	//! Is the GPU a tegra device.
@@ -1036,6 +1040,7 @@ struct vk_device_features
 	bool timeline_semaphore;
 	bool synchronization_2;
 	bool ext_fmt_resolve;
+	bool buffer_device_address;
 };
 
 /*!

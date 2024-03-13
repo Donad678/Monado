@@ -837,6 +837,7 @@ fill_in_has_device_extensions(struct vk_bundle *vk, struct u_string_list *ext_li
 {
 	// beginning of GENERATED device extension code - do not modify - used by scripts
 	// Reset before filling out.
+	vk->has_KHR_buffer_device_address = false;
 	vk->has_KHR_external_fence_fd = false;
 	vk->has_KHR_external_semaphore_fd = false;
 	vk->has_KHR_format_feature_flags2 = false;
@@ -862,6 +863,13 @@ fill_in_has_device_extensions(struct vk_bundle *vk, struct u_string_list *ext_li
 
 	for (uint32_t i = 0; i < ext_count; i++) {
 		const char *ext = exts[i];
+
+#if defined(VK_KHR_buffer_device_address)
+		if (strcmp(ext, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME) == 0) {
+			vk->has_KHR_buffer_device_address = true;
+			continue;
+		}
+#endif // defined(VK_KHR_buffer_device_address)
 
 #if defined(VK_KHR_external_fence_fd)
 		if (strcmp(ext, VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME) == 0) {
@@ -1122,6 +1130,13 @@ filter_device_features(struct vk_bundle *vk,
 	};
 #endif
 
+#ifdef VK_KHR_buffer_device_address
+	VkPhysicalDeviceBufferDeviceAddressFeaturesKHR buffer_device_address_info = {
+	    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR,
+	    .pNext = NULL,
+	};
+#endif
+
 #ifdef VK_KHR_timeline_semaphore
 	VkPhysicalDeviceTimelineSemaphoreFeaturesKHR timeline_semaphore_info = {
 	    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES_KHR,
@@ -1152,6 +1167,13 @@ filter_device_features(struct vk_bundle *vk,
 	if (vk->has_EXT_robustness2) {
 		append_to_pnext_chain((VkBaseInStructure *)&physical_device_features,
 		                      (VkBaseInStructure *)&robust_info);
+	}
+#endif
+
+#ifdef VK_KHR_buffer_device_address
+	if (vk->has_KHR_buffer_device_address) {
+		append_to_pnext_chain((VkBaseInStructure *)&physical_device_features,
+		                      (VkBaseInStructure *)&buffer_device_address_info);
 	}
 #endif
 
@@ -1191,6 +1213,10 @@ filter_device_features(struct vk_bundle *vk,
 	CHECK(null_descriptor, robust_info.nullDescriptor);
 #endif
 
+#ifdef VK_KHR_buffer_device_address
+	CHECK(buffer_device_address, buffer_device_address_info.bufferDeviceAddress);
+#endif
+
 #ifdef VK_KHR_timeline_semaphore
 	CHECK(timeline_semaphore, timeline_semaphore_info.timelineSemaphore);
 #endif
@@ -1213,11 +1239,13 @@ filter_device_features(struct vk_bundle *vk,
 
 	VK_DEBUG(vk,
 	         "Features:"
+	         "\n\tbuffer_device_address: %i"
 	         "\n\tnull_descriptor: %i"
 	         "\n\tshader_image_gather_extended: %i"
 	         "\n\tshader_storage_image_write_without_format: %i"
 	         "\n\ttimeline_semaphore: %i"
 	         "\n\tsynchronization_2: %i",                                //
+	         device_features->buffer_device_address,                     //
 	         device_features->null_descriptor,                           //
 	         device_features->shader_image_gather_extended,              //
 	         device_features->shader_storage_image_write_without_format, //
@@ -1274,7 +1302,7 @@ vk_create_device(struct vk_bundle *vk,
 	filter_device_features(vk, vk->physical_device, optional_device_features, &device_features);
 	vk->features.timeline_semaphore = device_features.timeline_semaphore;
 	vk->features.synchronization_2 = device_features.synchronization_2;
-
+	vk->features.buffer_device_address = device_features.buffer_device_address;
 
 	/*
 	 * Queue
@@ -1356,6 +1384,16 @@ vk_create_device(struct vk_bundle *vk,
 	};
 #endif
 
+#ifdef VK_KHR_buffer_device_address
+	VkPhysicalDeviceBufferDeviceAddressFeaturesKHR buffer_device_address_info = {
+	    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR,
+	    .pNext = NULL,
+	    .bufferDeviceAddress = device_features.buffer_device_address,
+	    .bufferDeviceAddressCaptureReplay = VK_FALSE,
+	    .bufferDeviceAddressMultiDevice = VK_TRUE,
+	};
+#endif
+
 #ifdef VK_KHR_timeline_semaphore
 	VkPhysicalDeviceTimelineSemaphoreFeaturesKHR timeline_semaphore_info = {
 	    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES_KHR,
@@ -1397,6 +1435,13 @@ vk_create_device(struct vk_bundle *vk,
 #ifdef VK_EXT_robustness2
 	if (vk->has_EXT_robustness2) {
 		append_to_pnext_chain((VkBaseInStructure *)&device_create_info, (VkBaseInStructure *)&robust_info);
+	}
+#endif
+
+#ifdef VK_KHR_buffer_device_address
+	if (vk->has_KHR_buffer_device_address) {
+		append_to_pnext_chain((VkBaseInStructure *)&device_create_info,
+		                      (VkBaseInStructure *)&buffer_device_address_info);
 	}
 #endif
 
