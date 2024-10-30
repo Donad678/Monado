@@ -143,6 +143,12 @@ struct time_state;
  */
 typedef XrResult (*oxr_handle_destroyer)(struct oxr_logger *log, struct oxr_handle_base *hb);
 
+/*!
+ * Function pointer type to "do something" upon having an event polled.
+ *
+ * @relates oxr_event
+ */
+typedef void (*oxr_event_poll_callback_t)(const void *event, void *userdata);
 
 
 /*

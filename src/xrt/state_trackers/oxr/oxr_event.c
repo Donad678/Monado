@@ -1,9 +1,10 @@
-// Copyright 2018-2020, Collabora, Ltd.
+// Copyright 2018-2024, Collabora, Ltd.
 // SPDX-License-Identifier: BSL-1.0
 /*!
  * @file
  * @brief  Holds event related functions.
  * @author Jakob Bornecrantz <jakob@collabora.com>
+ * @author Rylie Pavlik <rylie.pavlik@collabora.com>
  * @ingroup oxr_main
  */
 
@@ -31,6 +32,8 @@ struct oxr_event
 	struct oxr_event *next;
 	size_t length;
 	XrResult result;
+	oxr_event_poll_callback_t callback;
+	void *userdata;
 };
 
 
@@ -400,6 +403,10 @@ oxr_poll_event(struct oxr_logger *log, struct oxr_instance *inst, XrEventDataBuf
 
 	ret = event->result;
 	memcpy(eventData, oxr_event_extra(event), event->length);
+
+	if (event->callback) {
+		event->callback(eventData, event->userdata);
+	}
 	free(event);
 
 	return ret;
