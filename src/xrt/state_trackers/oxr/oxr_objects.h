@@ -6,6 +6,7 @@
  * @brief  The objects representing OpenXR handles, and prototypes for internal functions used in the state tracker.
  * @author Jakob Bornecrantz <jakob@collabora.com>
  * @author Korcan Hussein <korcan.hussein@collabora.com>
+ * @author Rylie Pavlik <rylie.pavlik@collabora.com>
  * @ingroup oxr_main
  */
 
@@ -776,11 +777,26 @@ oxr_session_enumerate_formats(struct oxr_logger *log,
                               int64_t *formats);
 
 /*!
- * Change the state of the session, queues a event.
+ * Queue an event to change the state of the session.
+ *
+ * @ref oxr_session::state will actually change when event is polled,
+ * but @ref oxr_session::target_state will be updated immediately.
  */
 void
 oxr_session_change_state(struct oxr_logger *log, struct oxr_session *sess, XrSessionState state, XrTime time);
 
+/*!
+ * Queue an event to change the state of the session, with your custom callback.
+ *
+ * @note Your callback is responsible for performing the actual update of the session state too!
+ */
+void
+oxr_session_change_state_with_callback(struct oxr_logger *log,
+                                       struct oxr_session *sess,
+                                       XrSessionState state,
+                                       XrTime time,
+                                       oxr_event_poll_callback_t callback,
+                                       void *userdata);
 XrResult
 oxr_session_begin(struct oxr_logger *log, struct oxr_session *sess, const XrSessionBeginInfo *beginInfo);
 
@@ -1077,7 +1093,9 @@ XrResult
 oxr_event_push_XrEventDataSessionStateChanged(struct oxr_logger *log,
                                               struct oxr_session *sess,
                                               XrSessionState state,
-                                              XrTime time);
+                                              XrTime time,
+                                              oxr_event_poll_callback_t callback,
+                                              void *userdata);
 
 XrResult
 oxr_event_push_XrEventDataInteractionProfileChanged(struct oxr_logger *log, struct oxr_session *sess);
@@ -1764,7 +1782,10 @@ struct oxr_session
 
 	struct oxr_session *next;
 
+	/// This state is updated when a state change event is polled.
 	XrSessionState state;
+	/// This state is updated when the event is queued.
+	XrSessionState target_state;
 
 	/*!
 	 * There is a extra state between xrBeginSession has been called and

@@ -153,6 +153,13 @@ handle_reference_space_change_pending(struct oxr_logger *log,
 	return XR_SUCCESS;
 }
 
+static void
+session_change_state_default_callback(const void *event, void *userdata)
+{
+	struct oxr_session *sess = (struct oxr_session *)userdata;
+	const XrEventDataSessionStateChanged *ev = (const XrEventDataSessionStateChanged *)event;
+	sess->state = ev->state;
+}
 
 /*
  *
@@ -163,8 +170,9 @@ handle_reference_space_change_pending(struct oxr_logger *log,
 void
 oxr_session_change_state(struct oxr_logger *log, struct oxr_session *sess, XrSessionState state, XrTime time)
 {
-	oxr_event_push_XrEventDataSessionStateChanged(log, sess, state, time);
-	sess->state = state;
+	oxr_event_push_XrEventDataSessionStateChanged(log, sess, state, time, session_change_state_default_callback,
+	                                              sess);
+	sess->target_state = state;
 }
 
 XrResult
@@ -342,10 +350,12 @@ oxr_session_end(struct oxr_logger *log, struct oxr_session *sess)
 XrResult
 oxr_session_request_exit(struct oxr_logger *log, struct oxr_session *sess)
 {
-	if (sess->state == XR_SESSION_STATE_FOCUSED) {
+	// Queue the appropriate state changes, based on the *target* state
+	// (because there are events queued to get us there, and ours will queue after.)
+	if (sess->target_state == XR_SESSION_STATE_FOCUSED) {
 		oxr_session_change_state(log, sess, XR_SESSION_STATE_VISIBLE, 0);
 	}
-	if (sess->state == XR_SESSION_STATE_VISIBLE) {
+	if (sess->target_state == XR_SESSION_STATE_VISIBLE) {
 		oxr_session_change_state(log, sess, XR_SESSION_STATE_SYNCHRONIZED, 0);
 	}
 	if (!sess->has_ended_once) {
@@ -483,19 +493,25 @@ oxr_session_poll(struct oxr_logger *log, struct oxr_session *sess)
 		}
 	}
 
-	if (sess->state == XR_SESSION_STATE_SYNCHRONIZED && sess->compositor_visible) {
+	// If OpenXR session state has settled (no queued events) in one of these states, and a compositor condition
+	// applies, we automatically queue another session state change.
+	if (sess->state == XR_SESSION_STATE_SYNCHRONIZED && sess->target_state == XR_SESSION_STATE_SYNCHRONIZED &&
+	    sess->compositor_visible) {
 		oxr_session_change_state(log, sess, XR_SESSION_STATE_VISIBLE, 0);
 	}
 
-	if (sess->state == XR_SESSION_STATE_VISIBLE && sess->compositor_focused) {
+	if (sess->state == XR_SESSION_STATE_VISIBLE && sess->target_state == XR_SESSION_STATE_VISIBLE &&
+	    sess->compositor_focused) {
 		oxr_session_change_state(log, sess, XR_SESSION_STATE_FOCUSED, 0);
 	}
 
-	if (sess->state == XR_SESSION_STATE_FOCUSED && !sess->compositor_focused) {
+	if (sess->state == XR_SESSION_STATE_FOCUSED && sess->target_state == XR_SESSION_STATE_FOCUSED &&
+	    !sess->compositor_focused) {
 		oxr_session_change_state(log, sess, XR_SESSION_STATE_VISIBLE, 0);
 	}
 
-	if (sess->state == XR_SESSION_STATE_VISIBLE && !sess->compositor_visible) {
+	if (sess->state == XR_SESSION_STATE_VISIBLE && sess->target_state == XR_SESSION_STATE_VISIBLE &&
+	    !sess->compositor_visible) {
 		oxr_session_change_state(log, sess, XR_SESSION_STATE_SYNCHRONIZED, 0);
 	}
 
@@ -1259,6 +1275,7 @@ oxr_session_create(struct oxr_logger *log,
 	}
 
 	// Everything is in order, start the state changes.
+	// These do not actually take effect until they have been polled.
 	oxr_session_change_state(log, sess, XR_SESSION_STATE_IDLE, 0);
 	oxr_session_change_state(log, sess, XR_SESSION_STATE_READY, 0);
 

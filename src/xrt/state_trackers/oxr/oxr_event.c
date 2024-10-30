@@ -153,7 +153,9 @@ XrResult
 oxr_event_push_XrEventDataSessionStateChanged(struct oxr_logger *log,
                                               struct oxr_session *sess,
                                               XrSessionState state,
-                                              XrTime time)
+                                              XrTime time,
+                                              oxr_event_poll_callback_t callback,
+                                              void *userdata)
 {
 	struct oxr_instance *inst = sess->sys->inst;
 	XrEventDataSessionStateChanged *changed;
@@ -167,6 +169,8 @@ oxr_event_push_XrEventDataSessionStateChanged(struct oxr_logger *log,
 	changed->time = time;
 
 	event->result = XR_SUCCESS;
+	event->callback = callback;
+	event->userdata = userdata;
 
 	lock(inst);
 	push(inst, event);
