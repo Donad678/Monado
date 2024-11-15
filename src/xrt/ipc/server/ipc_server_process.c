@@ -978,9 +978,10 @@ ipc_server_get_system_properties(struct ipc_server *vs, struct xrt_system_proper
 	return XRT_SUCCESS;
 }
 
-#ifndef XRT_OS_ANDROID
 int
-ipc_server_main(int argc, char **argv, const struct ipc_server_main_info *ismi)
+ipc_server_main_common(const struct ipc_server_main_info *ismi,
+                       const struct ipc_server_callbacks *callbacks,
+                       void *data)
 {
 	xrt_result_t xret = XRT_SUCCESS;
 	int ret = -1;
@@ -1008,11 +1009,8 @@ ipc_server_main(int argc, char **argv, const struct ipc_server_main_info *ismi)
 	xret = init_all(s, log_level);
 	U_LOG_CHK_ONLY_PRINT(log_level, xret, "init_all");
 	if (xret != XRT_SUCCESS) {
-#ifdef XRT_OS_LINUX
-		// Print information how to debug issues.
-		print_linux_end_user_failed_information(log_level);
-#endif
-
+		// Propegate the failure.
+		callbacks->init_failed(xret, data);
 		u_debug_gui_stop(&s->debug_gui);
 		free(s);
 		return -1;
@@ -1021,12 +1019,14 @@ ipc_server_main(int argc, char **argv, const struct ipc_server_main_info *ismi)
 	// Start the debug UI now (if enabled).
 	u_debug_gui_start(s->debug_gui, s->xinst, s->xsysd);
 
-#ifdef XRT_OS_LINUX
-	// Print a very clear service started message.
-	print_linux_end_user_started_information(log_level);
-#endif
+	// Tell the callbacks we are entering the main-loop.
+	callbacks->mainloop_entering(s, s->xinst, data);
+
 	// Main loop.
 	ret = main_loop(s);
+
+	// Tell the callbacks we are leaving the main-loop.
+	callbacks->mainloop_left(s, s->xinst, data);
 
 	// Stop the UI before tearing everything down.
 	u_debug_gui_stop(&s->debug_gui);
@@ -1044,39 +1044,43 @@ ipc_server_main(int argc, char **argv, const struct ipc_server_main_info *ismi)
 	return ret;
 }
 
-#endif // !XRT_OS_ANDROID
 
-#ifdef XRT_OS_ANDROID
-int
-ipc_server_main_android(struct ipc_server **ps, void (*startup_complete_callback)(void *data), void *data)
+#ifndef XRT_OS_ANDROID
+
+void
+init_failed(xrt_result_t xret, void *data)
 {
-	xrt_result_t xret = XRT_SUCCESS;
-	int ret = -1;
-
-	// Get log level first.
-	enum u_logging_level log_level = debug_get_log_option_ipc_log();
-
-	struct ipc_server *s = U_TYPED_CALLOC(struct ipc_server);
-	U_LOG_D("Created IPC server!");
-
-	xret = init_all(s, log_level);
-	U_LOG_CHK_ONLY_PRINT(log_level, xret, "init_all");
-	if (xret != XRT_SUCCESS) {
-		free(s);
-		startup_complete_callback(data);
-		return -1;
-	}
-
-	*ps = s;
-	startup_complete_callback(data);
-
-	ret = main_loop(s);
-
-	teardown_all(s);
-	free(s);
-
-	U_LOG_I("Server exiting '%i'!", ret);
-
-	return ret;
+#ifdef XRT_OS_LINUX
+	// Print information how to debug issues.
+	print_linux_end_user_failed_information(debug_get_log_option_ipc_log());
+#endif
 }
-#endif // XRT_OS_ANDROID
+
+void
+mainloop_entering(struct ipc_server *s, struct xrt_instance *xinst, void *data)
+{
+#ifdef XRT_OS_LINUX
+	// Print a very clear service started message.
+	print_linux_end_user_started_information(s->log_level);
+#endif
+}
+
+void
+mainloop_left(struct ipc_server *s, struct xrt_instance *xinst, void *data)
+{
+	// No-op
+}
+
+int
+ipc_server_main(int argc, char **argv, const struct ipc_server_main_info *ismi)
+{
+	struct ipc_server_callbacks callbacks = {
+	    .init_failed = init_failed,
+	    .mainloop_entering = mainloop_entering,
+	    .mainloop_left = mainloop_left,
+	};
+
+	return ipc_server_main_common(ismi, &callbacks, NULL);
+}
+
+#endif // !XRT_OS_ANDROID
