@@ -44,7 +44,8 @@ createDevice(const wil::com_ptr<IDXGIAdapter> &adapter = nullptr, u_logging_leve
  * @param device D3D12 device
  * @param command_allocator
  * @param resource image
- * @param bits Swapchain usage bits
+ * @param compositor_resource_state The state of @p resource before first acquire and between release and acquire
+ * @param app_resource_state The state of @p resource between acquire and release
  * @param[out] out_acquire_command_list Command list to populate for xrAcquireSwapchainImage
  * @param[out] out_release_command_list Command list to populate for xrReleaseSwapchainImage
  * @return HRESULT
@@ -53,7 +54,8 @@ HRESULT
 createCommandLists(ID3D12Device &device,
                    ID3D12CommandAllocator &command_allocator,
                    ID3D12Resource &resource,
-                   enum xrt_swapchain_usage_bits bits,
+                   D3D12_RESOURCE_STATES compositor_resource_state,
+                   D3D12_RESOURCE_STATES app_resource_state,
                    wil::com_ptr<ID3D12CommandList> out_acquire_command_list,
                    wil::com_ptr<ID3D12CommandList> out_release_command_list);
 

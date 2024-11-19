@@ -70,12 +70,8 @@ createSharedHandle(ID3D12Device &device, const wil::com_ptr<ID3D12Resource> &ima
 
 
 xrt_result_t
-allocateSharedImages(ID3D12Device &device,
-                     const xrt_swapchain_create_info &xsci,
-                     size_t image_count,
-                     std::vector<wil::com_ptr<ID3D12Resource>> &out_images,
-                     std::vector<wil::unique_handle> &out_handles)
-try {
+convertCreateInfoToD3d12(const xrt_swapchain_create_info &xsci,
+                         size_t image_count, d3d12_swapchain_create_info& out_create_info) {
 	if (0 != (xsci.create & XRT_SWAPCHAIN_CREATE_PROTECTED_CONTENT)) {
 		return XRT_ERROR_SWAPCHAIN_FLAG_VALID_BUT_UNSUPPORTED;
 	}
@@ -107,17 +103,17 @@ try {
 	// Additionally, only copy operations are allowed with the resource.
 	D3D12_RESOURCE_FLAGS resource_flags = d3d_convert_usage_bits_to_d3d12_resource_flags(xsci.bits);
 
-	D3D12_RESOURCE_DESC desc{
-	    D3D12_RESOURCE_DIMENSION_TEXTURE2D, // Dimension
-	    0,                                  // Alignment
-	    xsci.width,                         // Width
-	    xsci.height,                        // Height
-	    (UINT16)xsci.array_size,            // DepthOrArraySize
-	    (UINT16)xsci.mip_count,             // MipLevels
-	    typeless_format,                    // Format
-	    sample_desc,                        // SampleDesc
-	    D3D12_TEXTURE_LAYOUT_UNKNOWN,       // Layout
-	    resource_flags                      // Flags;
+	D3D12_RESOURCE_DESC desc = {
+	    .Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D, 
+	    .Alignment = 0,                                  
+	    .Width = xsci.width,                         
+	    .Height = xsci.height,                        
+	    .DepthOrArraySize = (UINT16)xsci.array_size,            
+	    .MipLevels = (UINT16)xsci.mip_count,             
+	    .Format = typeless_format,                    
+	    .SampleDesc = sample_desc,                        
+	    .Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN,       
+	    .Flags = resource_flags                      
 	};
 
 	// Cubemap
@@ -126,19 +122,30 @@ try {
 	}
 
 	// Create resources and let the driver manage memory
-	std::vector<wil::com_ptr<ID3D12Resource>> images;
-	D3D12_HEAP_PROPERTIES heap{};
-	heap.Type = D3D12_HEAP_TYPE_DEFAULT;
-	D3D12_HEAP_FLAGS heap_flags = D3D12_HEAP_FLAG_SHARED;
-	D3D12_RESOURCE_STATES initial_resource_state = d3d_convert_usage_bits_to_d3d12_app_resource_state(xsci.bits);
+	out_create_info = d3d12_swapchain_create_info{
+		.image_count = image_count,
+		.desc = desc,
+		.initial_resource_state = d3d_convert_usage_bits_to_d3d12_app_resource_state(xsci.bits),
+		.heap = {.Type = D3D12_HEAP_TYPE_DEFAULT},
+		.heap_flags = D3D12_HEAP_FLAG_SHARED,
+	};
+	return XRT_SUCCESS;
+}
 
-	for (size_t i = 0; i < image_count; ++i) {
+xrt_result_t
+allocateSharedImages(ID3D12Device &device,
+                     const d3d12_swapchain_create_info &dsci,
+                     std::vector<wil::com_ptr<ID3D12Resource>> &out_images,
+                     std::vector<wil::unique_handle> &out_handles)
+try {
+	std::vector<wil::com_ptr<ID3D12Resource>> images;
+	for (size_t i = 0; i < dsci.image_count; ++i) {
 		wil::com_ptr<ID3D12Resource> tex;
 		HRESULT res = device.CreateCommittedResource( //
-		    &heap,                                    // pHeapProperties
-		    heap_flags,                               // HeapFlags
-		    &desc,                                    // pDesc
-		    initial_resource_state,                   // InitialResourceState
+		    &dsci.heap,                               // pHeapProperties
+		    dsci.heap_flags,                          // HeapFlags
+		    &dsci.desc,                               // pDesc
+		    dsci.initial_resource_state,              // InitialResourceState
 		    nullptr,                                  // pOptimizedClearValue
 		    IID_PPV_ARGS(tex.put()));                 // riidResource, ppvResource
 
@@ -149,7 +156,7 @@ try {
 	}
 
 	std::vector<wil::unique_handle> handles;
-	handles.reserve(image_count);
+	handles.reserve(dsci.image_count);
 	for (const auto &tex : images) {
 		handles.emplace_back(createSharedHandle(device, tex));
 	}
@@ -179,13 +186,23 @@ d3d12_images_allocate(struct xrt_image_native_allocator *xina,
 
 		std::vector<wil::com_ptr<ID3D12Resource>> images;
 		std::vector<wil::unique_handle> handles;
-		auto result = xrt::auxiliary::d3d::d3d12::allocateSharedImages( //
-		    *(d3da->device),                                            // device
-		    *xsci,                                                      // xsci
-		    image_count,                                                // image_count
-		    images,                                                     // out_images
-		    handles);                                                   // out_handles
 
+		// Validate xrt_swapchain_create_info and convert to D3D12 terms
+		xrt::auxiliary::d3d::d3d12::d3d12_swapchain_create_info dsci;
+		auto result = xrt::auxiliary::d3d::d3d12::convertCreateInfoToD3d12( //
+			*xsci,                                                          // xsci
+			image_count,                                                    // image_count
+			dsci);                                                          // out_create_info
+		if (result != XRT_SUCCESS) {
+			return result;
+		}
+
+		// Allocate images
+		result = xrt::auxiliary::d3d::d3d12::allocateSharedImages( //
+			*(d3da->device),                                       // device
+			dsci,                                                  // dsci
+			images,                                                // out_images
+			handles);                                              // out_handles
 		if (result != XRT_SUCCESS) {
 			return result;
 		}
