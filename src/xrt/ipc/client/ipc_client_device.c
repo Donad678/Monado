@@ -169,19 +169,6 @@ ipc_client_device_get_body_joints(struct xrt_device *xdev,
 }
 
 static void
-ipc_client_device_get_view_poses(struct xrt_device *xdev,
-                                 const struct xrt_vec3 *default_eye_relation,
-                                 int64_t at_timestamp_ns,
-                                 uint32_t view_count,
-                                 struct xrt_space_relation *out_head_relation,
-                                 struct xrt_fov *out_fovs,
-                                 struct xrt_pose *out_poses)
-{
-	// Empty
-	assert(false);
-}
-
-static void
 ipc_client_device_set_output(struct xrt_device *xdev, enum xrt_output_name name, const struct xrt_output_value *value)
 {
 	ipc_client_device_t *icd = ipc_client_device(xdev);
@@ -268,7 +255,7 @@ ipc_client_device_create(struct ipc_connection *ipc_c, struct xrt_tracking_origi
 	icd->base.get_face_tracking = ipc_client_device_get_face_tracking;
 	icd->base.get_body_skeleton = ipc_client_device_get_body_skeleton;
 	icd->base.get_body_joints = ipc_client_device_get_body_joints;
-	icd->base.get_view_poses = ipc_client_device_get_view_poses;
+	icd->base.get_view_poses = u_device_ni_get_view_poses;
 	icd->base.set_output = ipc_client_device_set_output;
 	icd->base.get_output_limits = ipc_client_device_get_output_limits;
 	icd->base.get_visibility_mask = ipc_client_device_get_visibility_mask;
