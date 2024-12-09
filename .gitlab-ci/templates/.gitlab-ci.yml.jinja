@@ -153,7 +153,12 @@ reuse:
 
 {%- if "cmake" in job.name %}
 
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
+{%- endif %}
+
+{%- if "arch:cmake:clang" in job.name %}
+
+    - cd build && ../.gitlab-ci/ci_lvp_hello_xr_test.sh && cd ..
 {%- endif %}
 
 {%- if job.artifact_path %}

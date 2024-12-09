@@ -349,7 +349,7 @@ debian:cmake:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh -DBUILD_DOC=ON
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
   artifacts:
     paths:
       - build/doc/html/
@@ -363,7 +363,7 @@ debian:cmake-no-opencv:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh -DXRT_HAVE_OPENCV=OFF
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 debian:cmake-no-sdl2:
   stage: build
@@ -374,7 +374,7 @@ debian:cmake-no-sdl2:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh -DXRT_HAVE_SDL2=OFF
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 debian:cmake-no-service:
   stage: build
@@ -385,7 +385,7 @@ debian:cmake-no-service:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh -DXRT_FEATURE_SERVICE=OFF
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 debian:cmake:32bit:
   stage: build
@@ -396,7 +396,7 @@ debian:cmake:32bit:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh -DCMAKE_TOOLCHAIN_FILE=.gitlab-ci/i386.cmake -DXRT_HAVE_OPENCV=OFF
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 debian:bullseye:cmake:
   stage: build
@@ -407,7 +407,7 @@ debian:bullseye:cmake:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 ndk:armeabi-v7a:
   stage: build
@@ -559,7 +559,7 @@ ubuntu:jammy:cmake:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 ubuntu:noble:cmake:
   stage: build
@@ -570,7 +570,7 @@ ubuntu:noble:cmake:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 arch:cmake:
   stage: build
@@ -581,7 +581,7 @@ arch:cmake:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 arch:cmake:clang:
   stage: build
@@ -592,7 +592,8 @@ arch:cmake:clang:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
+    - cd build && ../.gitlab-ci/ci_lvp_hello_xr_test.sh && cd ..
 
 alpine:cmake:
   stage: build
@@ -603,7 +604,7 @@ alpine:cmake:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 # Windows build
 windows:
