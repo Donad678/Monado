@@ -334,11 +334,25 @@ create_image(struct vk_bundle *vk, const struct xrt_swapchain_create_info *info,
 	    .handleTypes = memory_handle_type,
 	};
 
+	void* pNext_for_allocate = (void*)&export_alloc_info;
+#if defined(XRT_GRAPHICS_BUFFER_HANDLE_IS_AHARDWAREBUFFER)
+	VkImportAndroidHardwareBufferInfoANDROID import_memory_info = {
+		.sType = VK_STRUCTURE_TYPE_IMPORT_ANDROID_HARDWARE_BUFFER_INFO_ANDROID,
+		.pNext = NULL,
+	};
+	if(info->is_external_buffer){
+		AHardwareBuffer *native_buffer = NULL;
+		xrt_result_t xret1 = ahardwarebuffer_image_allocate(info, &native_buffer);
+		import_memory_info.buffer = native_buffer;
+		dedicated_memory_info.pNext = &import_memory_info;
+		pNext_for_allocate = (void*)&dedicated_memory_info;
+	}
+#endif
 	ret = vk_alloc_and_bind_image_memory(   //
 	    vk,                                 // vk_bundle
 	    image,                              // image
 	    requirements,                       // requirements
-	    &export_alloc_info,                 // pNext_for_allocate
+	    pNext_for_allocate,                 // pNext_for_allocate
 	    "vk_image_allocator::create_image", // caller_name
 	    &device_memory);                    // out_mem
 	if (ret != VK_SUCCESS) {
