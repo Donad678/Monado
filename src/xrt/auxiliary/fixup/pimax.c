@@ -345,18 +345,18 @@ pimax_update_fovs_from_mesh(struct pimax_device *dev)
 			return;
 		}
 		struct xrt_fov fov_lower, fov_upper;
-		float seperation = dev->device_config.ipd;
+		float separation = dev->device_config.ipd;
 		if (i == 0) {
-			seperation += dev->device_config.offset_h_0.val * 2;
+			separation += dev->device_config.offset_h_0.val * 2;
 		} else {
-			seperation += dev->device_config.offset_h_1.val * 2;
+			separation += dev->device_config.offset_h_1.val * 2;
 		}
 
 		int lower_mesh_idx = -1;
 		int upper_mesh_idx = -1;
 		// this assumes the entries are sorted with ascending lens separation
 		for (int i = dev->mesh_set->mesh_count - 1; i >= 0; i--) {
-			if (dev->mesh_set->meshes[i].ipd < seperation) {
+			if (dev->mesh_set->meshes[i].ipd < separation) {
 				upper_mesh_idx = i;
 				if (i == 0) {
 					if (dev->mesh_set->mesh_count > 1)
@@ -374,7 +374,7 @@ pimax_update_fovs_from_mesh(struct pimax_device *dev)
 				lower_mesh_idx--;
 		}
 		float range = dev->mesh_set->meshes[upper_mesh_idx].ipd - dev->mesh_set->meshes[lower_mesh_idx].ipd;
-		float amount = (seperation - dev->mesh_set->meshes[upper_mesh_idx].ipd) / range;
+		float amount = (separation - dev->mesh_set->meshes[upper_mesh_idx].ipd) / range;
 
 		fov_lower = dev->mesh_set->meshes[lower_mesh_idx].views[i].fov;
 		fov_upper = dev->mesh_set->meshes[upper_mesh_idx].views[i].fov;
@@ -407,11 +407,11 @@ pimax_compute_distortion_from_mesh(
 		return true;
 	}
 
-	float seperation = dev->device_config.ipd;
+	float separation = dev->device_config.ipd;
 	if (view == 0) {
-		seperation += dev->device_config.offset_h_0.val * 2;
+		separation += dev->device_config.offset_h_0.val * 2;
 	} else {
-		seperation += dev->device_config.offset_h_1.val * 2;
+		separation += dev->device_config.offset_h_1.val * 2;
 	}
 
 	// first, find the two closest meshes, could also be done in the poll function (probably better)
@@ -419,8 +419,8 @@ pimax_compute_distortion_from_mesh(
 	int upper_mesh_idx = -1;
 	// this assumes the entries are sorted with ascending lens separation
 	for (int i = dev->mesh_set->mesh_count - 1; i >= 0; i--) {
-		// U_LOG_D("Mesh %d: %f (%f)", i, dev->mesh_set->meshes[i].ipd, seperation);
-		if (dev->mesh_set->meshes[i].ipd < seperation) {
+		// U_LOG_D("Mesh %d: %f (%f)", i, dev->mesh_set->meshes[i].ipd, separation);
+		if (dev->mesh_set->meshes[i].ipd < separation) {
 			lower_mesh_idx = i;
 			if (i == (int)dev->mesh_set->mesh_count - 1) {
 				if (dev->mesh_set->mesh_count > 1)
@@ -441,7 +441,7 @@ pimax_compute_distortion_from_mesh(
 	}
 	/*U_LOG_D("Using meshes with IPDs %f and %f for IPD %f", dev->mesh_set->meshes[lower_mesh_idx].ipd,
 	    dev->mesh_set->meshes[upper_mesh_idx].ipd,
-	    seperation);*/
+	    separation);*/
 	float range = dev->mesh_set->meshes[upper_mesh_idx].ipd - dev->mesh_set->meshes[lower_mesh_idx].ipd;
 	struct xrt_vec2 pos = {u, v};
 
@@ -512,7 +512,7 @@ pimax_compute_distortion_from_mesh(
 	if (upper_mesh_idx == lower_mesh_idx) {
 		*out_result = triplets[0];
 	} else {
-		float amount = (seperation - dev->mesh_set->meshes[upper_mesh_idx].ipd) / range;
+		float amount = (separation - dev->mesh_set->meshes[upper_mesh_idx].ipd) / range;
 		*out_result = uv_triplet_lerp(triplets[0], triplets[1], amount);
 	}
 	float dir = view ? -1.f : 1.f;
