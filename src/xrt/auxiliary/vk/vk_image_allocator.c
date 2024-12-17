@@ -341,7 +341,7 @@ create_image(struct vk_bundle *vk, const struct xrt_swapchain_create_info *info,
 		.sType = VK_STRUCTURE_TYPE_IMPORT_ANDROID_HARDWARE_BUFFER_INFO_ANDROID,
 		.pNext = NULL,
 	};
-	if(info->is_external_buffer){
+	if(info->external_buffer){
 		xrt_result_t xret1 = ahardwarebuffer_image_allocate(info, &out_image->buffer_handle);
 		import_memory_info.buffer = out_image->buffer_handle;
 		dedicated_memory_info.pNext = &import_memory_info;
