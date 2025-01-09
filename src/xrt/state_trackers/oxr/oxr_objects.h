@@ -1484,8 +1484,6 @@ struct oxr_system
 	struct xrt_system_roles dynamic_roles_cache;
 	struct os_mutex sync_actions_mutex;
 
-	struct xrt_visibility_mask *visibility_mask[2];
-
 #ifdef OXR_HAVE_MNDX_xdev_space
 	bool supports_xdev_space;
 #endif

@@ -2100,7 +2100,9 @@ xrt_result_t
 ipc_handle_device_get_visibility_mask(volatile struct ipc_client_state *ics,
                                       uint32_t device_id,
                                       enum xrt_visibility_mask_type type,
-                                      uint32_t view_index)
+                                      uint32_t view_index,
+                                      uint32_t vertex_count,
+                                      uint32_t index_count)
 {
 	struct ipc_message_channel *imc = (struct ipc_message_channel *)&ics->imc;
 	struct ipc_device_get_visibility_mask_reply reply = XRT_STRUCT_INIT;
@@ -2109,39 +2111,46 @@ ipc_handle_device_get_visibility_mask(volatile struct ipc_client_state *ics,
 
 	// @todo verify
 	struct xrt_device *xdev = get_xdev(ics, device_id);
-	struct xrt_visibility_mask *mask = NULL;
-	if (xdev->get_visibility_mask) {
+
+	struct xrt_visibility_mask mask = {
+		.vertex_count = vertex_count,
+		.index_count = index_count,
+	};
+	reply.result = xrt_device_get_visibility_mask(xdev, type, view_index, &mask);
+
+	reply.vertex_count = mask.vertex_count;
+	reply.index_count = mask.index_count;
+
+	xret = ipc_send(imc, &reply, sizeof(reply));
+	if (xret != XRT_SUCCESS) {
+		IPC_ERROR(s, "Failed to send reply");
+		return xret;
+	}
+
+	if (vertex_count == mask.vertex_count && index_count == mask.index_count) {
+		struct xrt_vec2 vertices[mask.vertex_count];
+		uint32_t indices[mask.index_count];
+		mask.vertices = vertices;
+		mask.indices = indices;
 		xret = xrt_device_get_visibility_mask(xdev, type, view_index, &mask);
 		if (xret != XRT_SUCCESS) {
 			IPC_ERROR(s, "Failed to get visibility mask");
 			return xret;
 		}
-	} else {
-		struct xrt_fov fov = xdev->hmd->distortion.fov[view_index];
-		u_visibility_mask_get_default(type, &fov, &mask);
+
+		xret = ipc_send(imc, vertices, sizeof(vertices));
+		if (xret != XRT_SUCCESS) {
+			IPC_ERROR(s, "Failed to send vertices");
+			return xret;
+		}
+
+		xret = ipc_send(imc, indices, sizeof(indices));
+		if (xret != XRT_SUCCESS) {
+			IPC_ERROR(s, "Failed to send vertices");
+			return xret;
+		}
 	}
 
-	if (mask == NULL) {
-		IPC_ERROR(s, "Failed to get visibility mask");
-		reply.mask_size = 0;
-	} else {
-		reply.mask_size = xrt_visibility_mask_get_size(mask);
-	}
-
-	xret = ipc_send(imc, &reply, sizeof(reply));
-	if (xret != XRT_SUCCESS) {
-		IPC_ERROR(s, "Failed to send reply");
-		goto out_free;
-	}
-
-	xret = ipc_send(imc, mask, reply.mask_size);
-	if (xret != XRT_SUCCESS) {
-		IPC_ERROR(s, "Failed to send mask");
-		goto out_free;
-	}
-
-out_free:
-	free(mask);
 	return xret;
 }
 

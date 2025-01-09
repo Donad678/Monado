@@ -27,7 +27,7 @@ extern "C" {
 void
 u_visibility_mask_get_default(enum xrt_visibility_mask_type type,
                               const struct xrt_fov *fov,
-                              struct xrt_visibility_mask **out_mask);
+                              struct xrt_visibility_mask *out_mask);
 
 
 #ifdef __cplusplus

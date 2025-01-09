@@ -193,7 +193,7 @@ static xrt_result_t
 ipc_client_device_get_visibility_mask(struct xrt_device *xdev,
                                       enum xrt_visibility_mask_type type,
                                       uint32_t view_index,
-                                      struct xrt_visibility_mask **out_mask)
+                                      struct xrt_visibility_mask *out_mask)
 {
 	assert(false);
 	return XRT_ERROR_IPC_FAILURE;

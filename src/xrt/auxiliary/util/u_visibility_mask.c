@@ -41,58 +41,35 @@ static const uint32_t indices_line[] = {0, 1, 2, 3, 4, 5, 6, 7};
 void
 u_visibility_mask_get_default(enum xrt_visibility_mask_type type,
                               const struct xrt_fov *fov,
-                              struct xrt_visibility_mask **out_mask)
+                              struct xrt_visibility_mask *out_mask)
 {
-	struct xrt_visibility_mask *mask = NULL;
-	uint32_t nvertices = 0, nindices = 0;
-
-	switch (type) {
-	case XRT_VISIBILITY_MASK_TYPE_HIDDEN_TRIANGLE_MESH:
-		nvertices = ARRAY_SIZE(vertices_hidden);
-		nindices = ARRAY_SIZE(indices_hidden);
-		break;
-	case XRT_VISIBILITY_MASK_TYPE_VISIBLE_TRIANGLE_MESH:
-		nvertices = ARRAY_SIZE(vertices_visible);
-		nindices = ARRAY_SIZE(indices_visible);
-		break;
-	case XRT_VISIBILITY_MASK_TYPE_LINE_LOOP:
-		nvertices = ARRAY_SIZE(vertices_line);
-		nindices = ARRAY_SIZE(indices_line);
-		break;
-	}
-
-	const size_t size =
-	    sizeof(struct xrt_visibility_mask) + sizeof(uint32_t) * nindices + sizeof(struct xrt_vec2) * nvertices;
-	mask = U_CALLOC_WITH_CAST(struct xrt_visibility_mask, size);
-	if (mask == NULL) {
-		U_LOG_E("failed to allocate out xrt_visibility_mask");
-		goto out;
-	}
-
-
-	mask->index_count = nindices;
-	mask->vertex_count = nvertices;
-
 	const struct xrt_vec2 *vertices = NULL;
 	const uint32_t *indices = NULL;
 
 	switch (type) {
 	case XRT_VISIBILITY_MASK_TYPE_HIDDEN_TRIANGLE_MESH:
+		out_mask->vertex_count = ARRAY_SIZE(vertices_hidden);
+		out_mask->index_count = ARRAY_SIZE(indices_hidden);
 		vertices = vertices_hidden;
 		indices = indices_hidden;
 		break;
 	case XRT_VISIBILITY_MASK_TYPE_VISIBLE_TRIANGLE_MESH:
+		out_mask->vertex_count = ARRAY_SIZE(vertices_visible);
+		out_mask->index_count = ARRAY_SIZE(indices_visible);
 		vertices = vertices_visible;
 		indices = indices_visible;
 		break;
 	case XRT_VISIBILITY_MASK_TYPE_LINE_LOOP:
+		out_mask->vertex_count = ARRAY_SIZE(vertices_line);
+		out_mask->index_count = ARRAY_SIZE(indices_line);
 		vertices = vertices_line;
 		indices = indices_line;
 		break;
 	}
 
-	memcpy(xrt_visibility_mask_get_indices(mask), indices, sizeof(uint32_t) * nindices);
-
+	if (out_mask->vertices == NULL || out_mask->indices == NULL) {
+		return;
+	}
 
 	const struct xrt_fov copy = *fov;
 
@@ -108,17 +85,15 @@ u_visibility_mask_get_default(enum xrt_visibility_mask_type type,
 	const double tan_offset_x = ((tan_right + tan_left) - tan_half_width) / 2;
 	const double tan_offset_y = (-(tan_up + tan_down) - tan_half_height) / 2;
 
-	struct xrt_vec2 *dst = xrt_visibility_mask_get_vertices(mask);
-	for (uint32_t i = 0; i < nvertices; i++) {
-		struct xrt_vec2 v = vertices[i];
+	for (uint32_t i = 0; i < out_mask->vertex_count; i++) {
+		const struct xrt_vec2 *v = &vertices[i];
+		struct xrt_vec2 *dst = &out_mask->vertices[i];
 
 		// Yes this is really the simplest form, WolframAlpha agrees.
-		v.x = (v.x * 0.5 + 0.5) * tan_half_width + tan_offset_x;
-		v.y = (v.y * 0.5 + 0.5) * tan_half_height + tan_offset_y;
-
-		dst[i] = v;
+		dst->x = (v->x * 0.5 + 0.5) * tan_half_width + tan_offset_x;
+		dst->y = (v->y * 0.5 + 0.5) * tan_half_height + tan_offset_y;
 	}
 
-out:
-	*out_mask = mask; // Always NULL or allocated data.
+	memcpy(out_mask->indices, indices, sizeof(uint32_t) * out_mask->index_count);
+	return;
 }
