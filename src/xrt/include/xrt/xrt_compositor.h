@@ -231,6 +231,15 @@ struct xrt_layer_projection_view_data
 struct xrt_layer_projection_data
 {
 	struct xrt_layer_projection_view_data v[XRT_MAX_VIEWS];
+
+	//! Chroma key parameters
+	struct {
+		struct xrt_vec3 col;
+		float threshold; // Threshold value for chroma key matching
+		float smoothing; // Smoothing factor for edges
+    		float padding[3]; // Padding to maintain alignment
+	} chroma_key_settings;
+
 };
 
 /*!

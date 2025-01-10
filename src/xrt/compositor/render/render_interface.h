@@ -1282,6 +1282,14 @@ struct render_compute_layer_ubo_data
 		struct xrt_vec2 val;
 		float padding[XRT_MAX_VIEWS];
 	} quad_extent[RENDER_MAX_LAYERS];
+
+	//! Chroma key parameters
+	struct {
+		struct xrt_vec3 col;
+		float threshold; // Threshold value for chroma key matching
+		float smoothing; // Smoothing factor for edges
+    		float padding[3]; // Padding to maintain alignment
+	} chroma_key_settings;
 };
 
 /*!
