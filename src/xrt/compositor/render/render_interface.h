@@ -1285,6 +1285,7 @@ struct render_compute_layer_ubo_data
 
 	//! Chroma key parameters
 	struct {
+                //! Color key to match, expected values in non-linear sRGB color-space
 		struct xrt_colour_rgb_f32 col;
 		float threshold; // Threshold value for chroma key matching
 		float smoothing; // Smoothing factor for edges
