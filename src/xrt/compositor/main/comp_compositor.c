@@ -1190,21 +1190,3 @@ comp_main_create_system_compositor(struct xrt_device *xdev,
 
 	return comp_multi_create_system_compositor(&c->base.base, upaf, sys_info, !c->deferred_surface, out_xsysc);
 }
-
-
-static xrt_result_t
-compositor_set_chroma_key_params(struct xrt_compositor *xc,
-                                const struct xrt_vec3 *color,
-                                float threshold,
-                                float smoothing)
-{
-    struct comp_compositor *c = comp_compositor(xc);
-
-    // Store in the UBO data
-    struct xrt_layer_projection_data *proj_layer_data = &c->base.layer_accum.layers[0].data.proj;
-    proj_layer_data->chroma_key_settings.col = *color;
-    proj_layer_data->chroma_key_settings.threshold = threshold;
-    proj_layer_data->chroma_key_settings.smoothing = smoothing;
-
-    return XRT_SUCCESS;
-}

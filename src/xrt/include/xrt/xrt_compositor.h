@@ -234,10 +234,9 @@ struct xrt_layer_projection_data
 
 	//! Chroma key parameters
 	struct {
-		struct xrt_vec3 col;
+		struct xrt_colour_rgb_f32 col;
 		float threshold; // Threshold value for chroma key matching
 		float smoothing; // Smoothing factor for edges
-    		float padding[3]; // Padding to maintain alignment
 	} chroma_key_settings;
 
 };
@@ -2377,6 +2376,15 @@ struct xrt_multi_compositor_control
 	 * that non-overlay clients can be handled like overlay ones.
 	 */
 	xrt_result_t (*set_z_order)(struct xrt_system_compositor *xsc, struct xrt_compositor *xc, int64_t z_order);
+
+	/*!
+	 * Set the chroma key parameters for the base app's projection layers.
+	 * This is used to punch holes through opaque projection layers and adjust their blend mode.
+	 */
+	xrt_result_t (*set_base_chroma_key_params)(struct xrt_system_compositor *xsc,
+	                                           struct xrt_colour_rgb_f32 col,
+	                                           float threshold,
+	                                           float smoothing);
 
 	/*!
 	 * Tell this client/session if the main application is visible or not.

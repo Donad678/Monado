@@ -17,8 +17,8 @@
 
 #include "server/ipc_server.h"
 #include "ipc_server_generated.h"
+#include "xrt/xrt_compositor.h"
 #include "xrt/xrt_results.h"
-#include "xrt/compositor/multi/comp_multi_private.h"
 
 #ifdef XRT_GRAPHICS_SYNC_HANDLE_IS_FD
 #include <unistd.h>
@@ -2267,16 +2267,10 @@ ipc_handle_device_get_battery_status(
 
 xrt_result_t
 ipc_handle_compositor_set_chroma_key_params(volatile struct ipc_client_state *ics,
-                                           const struct xrt_vec3 *color,
+                                           const struct xrt_colour_rgb_f32 *color,
                                            float threshold,
                                            float smoothing)
 {
-    IPC_TRACE_MARKER();
-
-    if (ics->xc == NULL) {
-        return XRT_ERROR_IPC_SESSION_NOT_CREATED;
-    }
-
-    struct multi_system_compositor *msc = (multi_system_compositor *) *ics->server->xsysc;
-    return xrt_comp_set_chroma_key_params(ics->xc, color, threshold, smoothing);
+    struct xrt_system_compositor *sysc = ics->server->xsysc;
+    return (sysc->xmcc->set_base_chroma_key_params)(sysc, *color, threshold, smoothing);
 }

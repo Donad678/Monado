@@ -1285,7 +1285,7 @@ struct render_compute_layer_ubo_data
 
 	//! Chroma key parameters
 	struct {
-		struct xrt_vec3 col;
+		struct xrt_colour_rgb_f32 col;
 		float threshold; // Threshold value for chroma key matching
 		float smoothing; // Smoothing factor for edges
     		float padding[3]; // Padding to maintain alignment
