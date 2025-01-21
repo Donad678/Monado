@@ -478,10 +478,13 @@
 		"in": [
 			{"name": "id", "type": "uint32_t"},
 			{"name": "type", "type": "enum xrt_visibility_mask_type"},
-			{"name": "view_index", "type": "uint32_t"}
+			{"name": "view_index", "type": "uint32_t"},
+			{"name": "vertex_count", "type": "uint32_t"},
+			{"name": "index_count", "type": "uint32_t"}
 		],
 		"out": [
-			{"name": "mask_size", "type": "uint32_t"}
+			{"name": "vertex_count", "type": "uint32_t"},
+			{"name": "index_count", "type": "uint32_t"}
 		]
 	},
 

@@ -484,7 +484,7 @@ struct xrt_device
 	xrt_result_t (*get_visibility_mask)(struct xrt_device *xdev,
 	                                    enum xrt_visibility_mask_type type,
 	                                    uint32_t view_index,
-	                                    struct xrt_visibility_mask **out_mask);
+	                                    struct xrt_visibility_mask *out_mask);
 
 	/*!
 	 * Called by the @ref xrt_space_overseer when a reference space that is
@@ -704,7 +704,7 @@ static inline xrt_result_t
 xrt_device_get_visibility_mask(struct xrt_device *xdev,
                                enum xrt_visibility_mask_type type,
                                uint32_t view_index,
-                               struct xrt_visibility_mask **out_mask)
+                               struct xrt_visibility_mask *out_mask)
 {
 	return xdev->get_visibility_mask(xdev, type, view_index, out_mask);
 }

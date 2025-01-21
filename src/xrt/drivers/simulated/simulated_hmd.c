@@ -14,14 +14,15 @@
 #include "math/m_api.h"
 #include "math/m_mathinclude.h"
 
-#include "util/u_var.h"
-#include "util/u_misc.h"
-#include "util/u_time.h"
 #include "util/u_debug.h"
 #include "util/u_device.h"
-#include "util/u_logging.h"
-#include "util/u_pretty_print.h"
 #include "util/u_distortion_mesh.h"
+#include "util/u_logging.h"
+#include "util/u_misc.h"
+#include "util/u_pretty_print.h"
+#include "util/u_time.h"
+#include "util/u_var.h"
+#include "util/u_visibility_mask.h"
 
 #include "simulated_interface.h"
 
@@ -175,6 +176,17 @@ simulated_ref_space_usage(struct xrt_device *xdev,
 }
 
 
+static xrt_result_t
+simulated_hmd_get_visibility_mask(struct xrt_device *xdev,
+                                  enum xrt_visibility_mask_type type,
+                                  uint32_t view_index,
+                                  struct xrt_visibility_mask *out_mask)
+{
+	struct xrt_fov fov = xdev->hmd->distortion.fov[view_index];
+	u_visibility_mask_get_default(type, &fov, out_mask);
+	return XRT_SUCCESS;
+}
+
 /*
  *
  * 'Exported' functions.
@@ -197,6 +209,7 @@ simulated_hmd_create(enum simulated_movement movement, const struct xrt_pose *ce
 	hmd->base.get_tracked_pose = simulated_hmd_get_tracked_pose;
 	hmd->base.get_view_poses = u_device_get_view_poses;
 	hmd->base.ref_space_usage = simulated_ref_space_usage;
+	hmd->base.get_visibility_mask = simulated_hmd_get_visibility_mask;
 	hmd->base.destroy = simulated_hmd_destroy;
 	hmd->base.name = XRT_DEVICE_GENERIC_HMD;
 	hmd->base.device_type = XRT_DEVICE_TYPE_HMD;

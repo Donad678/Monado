@@ -1510,52 +1510,34 @@ oxr_session_get_visibility_mask(struct oxr_logger *log,
                                 uint32_t viewIndex,
                                 XrVisibilityMaskKHR *visibilityMask)
 {
-	struct oxr_system *sys = sess->sys;
 	struct xrt_device *xdev = GET_XDEV_BY_ROLE(sess->sys, head);
 	enum xrt_visibility_mask_type type = convert_mask_type(visibilityMaskType);
-	xrt_result_t xret;
 
-	assert(viewIndex < ARRAY_SIZE(sys->visibility_mask));
+	struct xrt_visibility_mask mask = {0};
 
-	struct xrt_visibility_mask *mask = sys->visibility_mask[viewIndex];
+	xrt_result_t xret = xrt_device_get_visibility_mask(xdev, type, viewIndex, &mask);
+	OXR_CHECK_XRET(log, sess, xret, xrt_get_visibility_mask);
 
-	// Do we need to free the mask.
-	if (mask != NULL && mask->type != type) {
-		free(mask);
-		mask = NULL;
-		sys->visibility_mask[viewIndex] = NULL;
-	}
-
-	// If we didn't have any cached mask get it.
-	if (mask == NULL) {
-		xret = xrt_device_get_visibility_mask(xdev, type, viewIndex, &mask);
-		if (xret == XRT_ERROR_NOT_IMPLEMENTED && xdev->hmd != NULL) {
-			const struct xrt_fov fov = xdev->hmd->distortion.fov[viewIndex];
-			u_visibility_mask_get_default(type, &fov, &mask);
-			xret = XRT_SUCCESS;
-		}
-		OXR_CHECK_XRET(log, sess, xret, get_visibility_mask);
-		sys->visibility_mask[viewIndex] = mask;
-	}
-
-	visibilityMask->vertexCountOutput = mask->vertex_count;
-	visibilityMask->indexCountOutput = mask->index_count;
+	visibilityMask->vertexCountOutput = mask.vertex_count;
+	visibilityMask->indexCountOutput = mask.index_count;
 
 	if (visibilityMask->vertexCapacityInput == 0 || visibilityMask->indexCapacityInput == 0) {
 		return XR_SUCCESS;
 	}
 
-	if (visibilityMask->vertexCapacityInput < mask->vertex_count) {
+	if (visibilityMask->vertexCapacityInput < mask.vertex_count) {
 		return oxr_error(log, XR_ERROR_SIZE_INSUFFICIENT, "vertexCapacityInput is %u, need %u",
-		                 visibilityMask->vertexCapacityInput, mask->vertex_count);
-	} else if (visibilityMask->indexCapacityInput < mask->index_count) {
+		                 visibilityMask->vertexCapacityInput, mask.vertex_count);
+	} else if (visibilityMask->indexCapacityInput < mask.index_count) {
 		return oxr_error(log, XR_ERROR_SIZE_INSUFFICIENT, "indexCapacityInput is %u, need %u",
-		                 visibilityMask->indexCapacityInput, mask->index_count);
+		                 visibilityMask->indexCapacityInput, mask.index_count);
 	}
 
-	memcpy(visibilityMask->vertices, xrt_visibility_mask_get_vertices(mask),
-	       sizeof(struct xrt_vec2) * mask->vertex_count);
-	memcpy(visibilityMask->indices, xrt_visibility_mask_get_indices(mask), sizeof(uint32_t) * mask->index_count);
+	mask.vertices = (struct xrt_vec2 *)visibilityMask->vertices;
+	mask.indices = visibilityMask->indices;
+
+	xret = xrt_device_get_visibility_mask(xdev, type, viewIndex, &mask);
+	OXR_CHECK_XRET(log, sess, xret, xrt_get_visibility_mask);
 
 	return XR_SUCCESS;
 }

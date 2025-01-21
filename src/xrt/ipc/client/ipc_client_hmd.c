@@ -275,38 +275,38 @@ static xrt_result_t
 ipc_client_hmd_get_visibility_mask(struct xrt_device *xdev,
                                    enum xrt_visibility_mask_type type,
                                    uint32_t view_index,
-                                   struct xrt_visibility_mask **out_mask)
+                                   struct xrt_visibility_mask *out_mask)
 {
 	ipc_client_hmd_t *ich = ipc_client_hmd(xdev);
 	struct ipc_connection *ipc_c = ich->ipc_c;
-	struct xrt_visibility_mask *mask = NULL;
 	xrt_result_t xret;
 
 	ipc_client_connection_lock(ipc_c);
 
-	xret = ipc_send_device_get_visibility_mask_locked(ipc_c, ich->device_id, type, view_index);
+	xret = ipc_send_device_get_visibility_mask_locked(ipc_c, ich->device_id, type, view_index,
+	                                                  out_mask->vertex_count, out_mask->index_count);
 	IPC_CHK_WITH_GOTO(ipc_c, xret, "ipc_send_device_get_visibility_mask_locked", err_mask_unlock);
 
-	uint32_t mask_size;
-	xret = ipc_receive_device_get_visibility_mask_locked(ipc_c, &mask_size);
+	uint32_t vertex_count = 0, index_count = 0;
+	xret = ipc_receive_device_get_visibility_mask_locked(ipc_c, &vertex_count, &index_count);
 	IPC_CHK_WITH_GOTO(ipc_c, xret, "ipc_receive_device_get_visibility_mask_locked", err_mask_unlock);
 
-	mask = U_CALLOC_WITH_CAST(struct xrt_visibility_mask, mask_size);
-	if (mask == NULL) {
-		IPC_ERROR(ich->ipc_c, "failed to allocate xrt_visibility_mask");
-		goto err_mask_unlock;
+	if (vertex_count == out_mask->vertex_count && index_count == out_mask->index_count) {
+		assert(out_mask->vertices);
+		xret = ipc_receive(&ipc_c->imc, out_mask->vertices, sizeof(struct xrt_vec2) * out_mask->vertex_count);
+		IPC_CHK_WITH_GOTO(ipc_c, xret, "ipc_receive vertices", err_mask_unlock);
+
+		assert(out_mask->indices);
+		xret = ipc_receive(&ipc_c->imc, out_mask->indices, sizeof(uint32_t) * out_mask->index_count);
+		IPC_CHK_WITH_GOTO(ipc_c, xret, "ipc_receive indices", err_mask_unlock);
+	} else {
+		out_mask->vertex_count = vertex_count;
+		out_mask->index_count = index_count;
 	}
 
-	xret = ipc_receive(&ipc_c->imc, mask, mask_size);
-	IPC_CHK_WITH_GOTO(ipc_c, xret, "ipc_receive", err_mask_free);
-
-	*out_mask = mask;
 	ipc_client_connection_unlock(ipc_c);
-
 	return XRT_SUCCESS;
 
-err_mask_free:
-	free(mask);
 err_mask_unlock:
 	ipc_client_connection_unlock(ipc_c);
 	return XRT_ERROR_IPC_FAILURE;
