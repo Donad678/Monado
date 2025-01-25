@@ -112,6 +112,8 @@ find_package(cJSON MODULE)
 find_package(LeapV2 MODULE)
 find_package(LeapSDK 5 CONFIG)
 find_package(ONNXRuntime MODULE)
+find_package(OpenNI2 MODULE)
+find_package(NiTE2 MODULE)
 if(NOT WIN32)
 	find_package(EGL MODULE)
 	find_package(Percetto MODULE)
@@ -313,6 +315,7 @@ option_with_deps(XRT_BUILD_DRIVER_TWRAP "Enable Tracking Wrapper drivers" ON) # 
 option_with_deps(XRT_BUILD_DRIVER_HDK "Enable HDK driver" DEPENDS XRT_HAVE_INTERNAL_HID)
 option_with_deps(XRT_BUILD_DRIVER_HYDRA "Enable Hydra driver" DEPENDS XRT_HAVE_INTERNAL_HID)
 option_with_deps(XRT_BUILD_DRIVER_ILLIXR "Enable ILLIXR driver" DEPENDS ILLIXR_PATH)
+option_with_deps(XRT_BUILD_DRIVER_KINECT "Enable Kinect driver" DEPENDS NiTE2_FOUND OpenNI2_FOUND XRT_HAVE_LINUX)
 option(XRT_BUILD_DRIVER_NS "Enable North Star driver" ON)
 option_with_deps(XRT_BUILD_DRIVER_OHMD "Enable OpenHMD driver" DEPENDS OPENHMD_FOUND)
 option_with_deps(XRT_BUILD_DRIVER_OPENGLOVES "Enable OpenGloves driver" DEPENDS XRT_HAVE_LIBUDEV XRT_HAVE_BLUETOOTH)
@@ -430,6 +433,7 @@ list(
 	"TWRAP"
 	"XREAL_AIR"
 	"STEAMVR_LIGHTHOUSE"
+	"KINECT"
 	)
 
 # Package name needs to be known by the native code itself.
@@ -633,6 +637,7 @@ message(STATUS "#    DRIVER_HANDTRACKING:         ${XRT_BUILD_DRIVER_HANDTRACKIN
 message(STATUS "#    DRIVER_HDK:                  ${XRT_BUILD_DRIVER_HDK}")
 message(STATUS "#    DRIVER_HYDRA:                ${XRT_BUILD_DRIVER_HYDRA}")
 message(STATUS "#    DRIVER_ILLIXR:               ${XRT_BUILD_DRIVER_ILLIXR}")
+message(STATUS "#    DRIVER_KINECT:               ${XRT_BUILD_DRIVER_KINECT}")
 message(STATUS "#    DRIVER_NS:                   ${XRT_BUILD_DRIVER_NS}")
 message(STATUS "#    DRIVER_OHMD:                 ${XRT_BUILD_DRIVER_OHMD}")
 message(STATUS "#    DRIVER_OPENGLOVES:           ${XRT_BUILD_DRIVER_OPENGLOVES}")

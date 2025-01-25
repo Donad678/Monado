@@ -30,6 +30,8 @@ if(XRT_BUILD_DRIVER_DAYDREAM)
 	list(APPEND ENABLED_DRIVERS daydream)
 endif()
 
+
+
 if(XRT_BUILD_DRIVER_DEPTHAI)
 	add_library(drv_depthai STATIC depthai/depthai_driver.cpp depthai/depthai_interface.h)
 	target_link_libraries(
@@ -45,6 +47,13 @@ if(XRT_BUILD_DRIVER_DEPTHAI)
 		)
 	target_include_directories(drv_depthai PRIVATE ${OpenCV_INCLUDE_DIRS})
 	list(APPEND ENABLED_DRIVERS depthai)
+endif()
+
+if(XRT_BUILD_DRIVER_KINECT)
+	add_library(drv_kinect STATIC kinect/kinect_device.h kinect/kinect_device.cpp)
+	target_link_libraries(drv_kinect PRIVATE xrt-interfaces aux_util aux_os aux_os_ble OpenNI2::OpenNI2 NiTE2::NiTE2)
+	target_include_directories(drv_kinect PRIVATE ${OpenNI2_INCLUDE_DIRS})
+	list(APPEND ENABLED_DRIVERS kinect)
 endif()
 
 if(XRT_BUILD_DRIVER_SIMULATED)

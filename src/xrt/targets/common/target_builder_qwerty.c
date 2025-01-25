@@ -18,6 +18,11 @@
 
 #include "qwerty/qwerty_interface.h"
 
+#if defined(XRT_BUILD_DRIVER_KINECT)
+	#include "kinect/kinect_device.h"
+	#define XRT_FEATURE_OPENXR_BODY_TRACKING_FULL_BODY_META
+#endif
+
 #include <assert.h>
 
 
@@ -99,6 +104,16 @@ qwerty_open_system_impl(struct xrt_builder *xb,
 	ubrh->head = head;
 	ubrh->left = left;
 	ubrh->right = right;
+
+#if defined(XRT_BUILD_DRIVER_KINECT)
+	const uint32_t count = kinect_device_create_xdevs(xsysd->static_roles.head, &xsysd->xdevs[xsysd->xdev_count], ARRAY_SIZE(xsysd->xdevs) - xsysd->xdev_count);
+
+	if (count != 0) {
+		xsysd->static_roles.body = xsysd->xdevs[xsysd->xdev_count];
+	}
+
+	xsysd->xdev_count += count;
+#endif
 
 	return XRT_SUCCESS;
 }
