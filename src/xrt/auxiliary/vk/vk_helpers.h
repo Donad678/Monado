@@ -129,6 +129,7 @@ struct vk_bundle
 
 	// beginning of GENERATED device extension code - do not modify - used by scripts
 	bool has_KHR_buffer_device_address;
+	bool has_KHR_device_group;
 	bool has_KHR_external_fence_fd;
 	bool has_KHR_external_semaphore_fd;
 	bool has_KHR_format_feature_flags2;

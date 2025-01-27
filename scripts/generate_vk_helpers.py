@@ -295,6 +295,7 @@ INSTANCE_EXTENSIONS_TO_CHECK = [
 # Sorted KHR, EXT, Vendor, interally alphabetically
 DEVICE_EXTENSIONS_TO_CHECK = [
     "VK_KHR_buffer_device_address",
+    "VK_KHR_device_group",
     "VK_KHR_external_fence_fd",
     "VK_KHR_external_semaphore_fd",
     "VK_KHR_format_feature_flags2",
