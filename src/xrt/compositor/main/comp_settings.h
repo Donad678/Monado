@@ -1,10 +1,11 @@
-// Copyright 2019, Collabora, Ltd.
+// Copyright 2019-2025, Collabora, Ltd.
 // SPDX-License-Identifier: BSL-1.0
 /*!
  * @file
  * @brief  Settings struct for compositor header.
  * @author Lubosz Sarnecki <lubosz.sarnecki@collabora.com>
  * @author Jakob Bornecrantz <jakob@collabora.com>
+ * @author Korcan Hussein <korcan.hussein@collabora.com>
  * @ingroup comp_main
  */
 
@@ -84,6 +85,15 @@ struct comp_settings
 
 	//! Nominal frame interval
 	int64_t nominal_frame_interval_ns;
+
+	/*
+	 * Vulkan physical device group selected by comp_settings_check_vulkan_caps
+	 * may be forced by user.
+	 *
+	 * Only relevant when @ref use_device_group is enabled and the extensions
+	 * VK_KHR_device_group(_creation) are supported.
+	 */
+	int selected_gpu_group_index;
 
 	//! Vulkan physical device selected by comp_settings_check_vulkan_caps
 	//! may be forced by user
