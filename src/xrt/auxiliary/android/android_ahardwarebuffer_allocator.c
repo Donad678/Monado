@@ -42,10 +42,9 @@ vk_format_to_ahardwarebuffer(uint64_t format)
 	case VK_FORMAT_D32_SFLOAT: return AHARDWAREBUFFER_FORMAT_D32_FLOAT;
 	case VK_FORMAT_R16G16B16A16_SFLOAT: return AHARDWAREBUFFER_FORMAT_R16G16B16A16_FLOAT;
 	case VK_FORMAT_R8G8B8A8_SRGB:
-		/* apply EGL_GL_COLORSPACE_KHR, EGL_GL_COLORSPACE_SRGB_KHR! */
-		return AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
+		// Format not supported natively by AHB, colorspace must be corrected
 	case VK_FORMAT_R8G8B8A8_UNORM: return AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
-	default: return 0;
+	default: AHB_ERROR("Could not convert 0x%02" PRIx64 " to AHardwareBuffer_Format!", format); return 0;
 	}
 }
 
@@ -77,13 +76,17 @@ bool
 ahardwarebuffer_is_supported(uint64_t format, enum xrt_swapchain_usage_bits xbits)
 {
 	// Minimal buffer description to probe support
-	AHardwareBuffer_Desc desc = {
+	const AHardwareBuffer_Desc desc = {
 	    .width = 16,
 	    .height = 16,
 	    .layers = 1,
 	    .format = vk_format_to_ahardwarebuffer(format),
 	    .usage = swapchain_usage_to_ahardwarebuffer(xbits),
 	};
+
+	if (desc.format == 0) {
+		return false;
+	}
 
 #if __ANDROID_API__ >= 29
 	return AHardwareBuffer_isSupported(&desc);
