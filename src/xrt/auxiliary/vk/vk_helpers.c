@@ -1176,9 +1176,10 @@ vk_create_image_from_native(struct vk_bundle *vk,
 	}
 
 	VkMemoryRequirements requirements = {0};
-	vk->vkGetImageMemoryRequirements(vk->device, image, &requirements);
 
 #if defined(XRT_GRAPHICS_BUFFER_HANDLE_IS_FD)
+	vk->vkGetImageMemoryRequirements(vk->device, image, &requirements);
+
 	VkImportMemoryFdInfoKHR import_memory_info = {
 	    .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR,
 	    .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT_KHR,
@@ -1203,9 +1204,16 @@ vk_create_image_from_native(struct vk_bundle *vk,
 		return ret;
 	}
 
+	/*
+	 * VUID-vkGetImageMemoryRequirements-image-04004
+	 * We can't query memory requirements from image created from AHB before they are bound to memory so we take
+	 * them from the imported AHB buffer directly.
+	 */
 	requirements.size = ahb_props.allocationSize;
 	requirements.memoryTypeBits = ahb_props.memoryTypeBits;
 #elif defined(XRT_GRAPHICS_BUFFER_HANDLE_IS_WIN32_HANDLE)
+	vk->vkGetImageMemoryRequirements(vk->device, image, &requirements);
+
 	VkImportMemoryWin32HandleInfoKHR import_memory_info = {
 	    .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR,
 	    .pNext = NULL,
