@@ -64,6 +64,10 @@ swapchain_usage_to_ahardwarebuffer(enum xrt_swapchain_usage_bits bits)
 		ahb_usage |= AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT;
 	}
 
+	if (bits & XRT_SWAPCHAIN_USAGE_UNORDERED_ACCESS) {
+		ahb_usage |= AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER;
+	}
+
 	// Fallback if no bits are set
 	if (ahb_usage == 0) {
 		ahb_usage = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
