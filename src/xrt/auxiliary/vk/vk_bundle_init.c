@@ -1,4 +1,4 @@
-// Copyright 2019-2024, Collabora, Ltd.
+// Copyright 2019-2025, Collabora, Ltd.
 // SPDX-License-Identifier: BSL-1.0
 /*!
  * @file
@@ -15,6 +15,7 @@
  * @author Lubosz Sarnecki <lubosz.sarnecki@collabora.com>
  * @author Moses Turner <moses@collabora.com>
  * @author Korcan Hussein <korcan.hussein@collabora.com>
+ * @author Elise Doucet <elise.doucet@univ-lille.fr>
  * @ingroup aux_vk
  */
 
@@ -188,6 +189,7 @@ vk_fill_in_has_instance_extensions(struct vk_bundle *vk, struct u_string_list *e
 {
 	// beginning of GENERATED instance extension code - do not modify - used by scripts
 	// Reset before filling out.
+	vk->has_KHR_device_group_creation = false;
 	vk->has_EXT_display_surface_counter = false;
 	vk->has_EXT_swapchain_colorspace = false;
 	vk->has_EXT_debug_utils = false;
@@ -197,6 +199,13 @@ vk_fill_in_has_instance_extensions(struct vk_bundle *vk, struct u_string_list *e
 
 	for (uint32_t i = 0; i < ext_count; i++) {
 		const char *ext = exts[i];
+
+#if defined(VK_KHR_device_group_creation)
+		if (strcmp(ext, VK_KHR_DEVICE_GROUP_CREATION_EXTENSION_NAME) == 0) {
+			vk->has_KHR_device_group_creation = true;
+			continue;
+		}
+#endif // defined(VK_KHR_device_group_creation)
 
 #if defined(VK_EXT_display_surface_counter)
 		if (strcmp(ext, VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME) == 0) {
@@ -569,6 +578,8 @@ select_physical_device(struct vk_bundle *vk, int forced_index)
 	uint32_t gpu_count = 0;
 	VkResult ret;
 
+	vk->features.use_device_group = false;
+
 	ret = vk_enumerate_physical_devices( //
 	    vk,                              // vk_bundle
 	    &gpu_count,                      // out_physical_device_count
@@ -629,6 +640,92 @@ select_physical_device(struct vk_bundle *vk, int forced_index)
 	vk->vkGetPhysicalDeviceMemoryProperties(vk->physical_device, &vk->device_memory_props);
 
 	return VK_SUCCESS;
+}
+
+static VkResult
+select_physical_device_group(struct vk_bundle *vk, const struct vk_physical_device_indices *forced_phys_device)
+{
+	const struct vk_physical_device_indices forced_indices =
+	    forced_phys_device ? *forced_phys_device : VK_PHYSICAL_DEVICE_INDICES_INIT;
+
+#ifdef VK_KHR_device_group_creation
+	vk->features.use_device_group = false;
+
+	if (!vk->has_KHR_device_group_creation) {
+		VK_WARN(vk,
+		        "VK_KHR_device_group_creation is not enabled/supported, fallback to single physical device.");
+		return select_physical_device(vk, forced_indices.device_index);
+	}
+
+	VK_DEBUG(vk, "Vulkan device groups requested, checking for available groups...");
+
+	// Check if a device group exists
+	uint32_t device_group_count = 0;
+	VkResult vk_ret = vk->vkEnumeratePhysicalDeviceGroups(vk->instance, &device_group_count, NULL);
+	if (vk_ret != VK_SUCCESS) {
+		VK_ERROR(vk,
+		         "vkEnumeratePhysicalDeviceGroups failed to obtain device group count: %s, fallback to single "
+		         "physical device.",
+		         vk_result_string(vk_ret));
+		return select_physical_device(vk, forced_indices.device_index);
+	}
+
+	// Only continue this path if count >= 1 (fallback to single physical device otherwise)
+	if (device_group_count < 1) {
+		VK_WARN(vk, "Device group requested but no group was found, fallback to single physical device.");
+		return select_physical_device(vk, forced_indices.device_index);
+	}
+
+	VkPhysicalDeviceGroupPropertiesKHR *physical_device_group_properties =
+	    U_TYPED_ARRAY_CALLOC(VkPhysicalDeviceGroupPropertiesKHR, device_group_count);
+	for (uint32_t i = 0; i < device_group_count; ++i) {
+		physical_device_group_properties[i].sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GROUP_PROPERTIES_KHR;
+		physical_device_group_properties[i].pNext = NULL;
+	}
+
+	vk_ret =
+	    vk->vkEnumeratePhysicalDeviceGroups(vk->instance, &device_group_count, physical_device_group_properties);
+	if (vk_ret != VK_SUCCESS) {
+		VK_ERROR(vk,
+		         "vkEnumeratePhysicalDeviceGroups failed to obtain device group properties %s, fallback to "
+		         "single physical device.",
+		         vk_result_string(vk_ret));
+		free(physical_device_group_properties);
+		return select_physical_device(vk, forced_indices.device_index);
+	}
+
+	const struct vk_physical_device_indices selected_indices = {
+	    .device_group_index = (forced_indices.device_group_index < 0) ? 0 : forced_indices.device_group_index,
+	    .device_index = (forced_indices.device_index < 0) ? 0 : forced_indices.device_index,
+	};
+
+	const VkPhysicalDeviceGroupPropertiesKHR selected_physical_group =
+	    physical_device_group_properties[selected_indices.device_group_index];
+	free(physical_device_group_properties);
+
+	VK_DEBUG(vk, "Device group found with a physical device count of %d.",
+	         selected_physical_group.physicalDeviceCount);
+	vk->physical_device = selected_physical_group.physicalDevices[selected_indices.device_index];
+	vk->device_group_properties = selected_physical_group;
+
+	// Print info
+	for (uint32_t i = 0; i < selected_physical_group.physicalDeviceCount; ++i) {
+		VkPhysicalDeviceProperties pdp = {0};
+		vk->vkGetPhysicalDeviceProperties(selected_physical_group.physicalDevices[i], &pdp);
+
+		char title[256] = {0};
+		(void)snprintf(title, sizeof(title), "Device group physical device number %u:\n", i);
+		vk_print_device_info(vk, U_LOGGING_INFO, &pdp, i, title);
+	}
+
+	// Fill out the device memory props as well.
+	vk->vkGetPhysicalDeviceMemoryProperties(vk->physical_device, &vk->device_memory_props);
+	vk->features.use_device_group = true;
+	return VK_SUCCESS;
+#else
+	VK_WARN(vk, "VK_KHR_device_group_creation is not defined, fallback to single physical device.");
+	return select_physical_device(vk, forced_indices.device_index);
+#endif
 }
 
 static VkResult
@@ -740,6 +837,8 @@ fill_in_has_device_extensions(struct vk_bundle *vk, struct u_string_list *ext_li
 {
 	// beginning of GENERATED device extension code - do not modify - used by scripts
 	// Reset before filling out.
+	vk->has_KHR_buffer_device_address = false;
+	vk->has_KHR_device_group = false;
 	vk->has_KHR_external_fence_fd = false;
 	vk->has_KHR_external_semaphore_fd = false;
 	vk->has_KHR_format_feature_flags2 = false;
@@ -765,6 +864,20 @@ fill_in_has_device_extensions(struct vk_bundle *vk, struct u_string_list *ext_li
 
 	for (uint32_t i = 0; i < ext_count; i++) {
 		const char *ext = exts[i];
+
+#if defined(VK_KHR_buffer_device_address)
+		if (strcmp(ext, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME) == 0) {
+			vk->has_KHR_buffer_device_address = true;
+			continue;
+		}
+#endif // defined(VK_KHR_buffer_device_address)
+
+#if defined(VK_KHR_device_group)
+		if (strcmp(ext, VK_KHR_DEVICE_GROUP_EXTENSION_NAME) == 0) {
+			vk->has_KHR_device_group = true;
+			continue;
+		}
+#endif // defined(VK_KHR_device_group)
 
 #if defined(VK_KHR_external_fence_fd)
 		if (strcmp(ext, VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME) == 0) {
@@ -1025,6 +1138,13 @@ filter_device_features(struct vk_bundle *vk,
 	};
 #endif
 
+#ifdef VK_KHR_buffer_device_address
+	VkPhysicalDeviceBufferDeviceAddressFeaturesKHR buffer_device_address_info = {
+	    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR,
+	    .pNext = NULL,
+	};
+#endif
+
 #ifdef VK_KHR_timeline_semaphore
 	VkPhysicalDeviceTimelineSemaphoreFeaturesKHR timeline_semaphore_info = {
 	    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES_KHR,
@@ -1055,6 +1175,13 @@ filter_device_features(struct vk_bundle *vk,
 	if (vk->has_EXT_robustness2) {
 		append_to_pnext_chain((VkBaseInStructure *)&physical_device_features,
 		                      (VkBaseInStructure *)&robust_info);
+	}
+#endif
+
+#ifdef VK_KHR_buffer_device_address
+	if (vk->has_KHR_buffer_device_address) {
+		append_to_pnext_chain((VkBaseInStructure *)&physical_device_features,
+		                      (VkBaseInStructure *)&buffer_device_address_info);
 	}
 #endif
 
@@ -1094,6 +1221,10 @@ filter_device_features(struct vk_bundle *vk,
 	CHECK(null_descriptor, robust_info.nullDescriptor);
 #endif
 
+#ifdef VK_KHR_buffer_device_address
+	CHECK(buffer_device_address, buffer_device_address_info.bufferDeviceAddress);
+#endif
+
 #ifdef VK_KHR_timeline_semaphore
 	CHECK(timeline_semaphore, timeline_semaphore_info.timelineSemaphore);
 #endif
@@ -1116,11 +1247,13 @@ filter_device_features(struct vk_bundle *vk,
 
 	VK_DEBUG(vk,
 	         "Features:"
+	         "\n\tbuffer_device_address: %i"
 	         "\n\tnull_descriptor: %i"
 	         "\n\tshader_image_gather_extended: %i"
 	         "\n\tshader_storage_image_write_without_format: %i"
 	         "\n\ttimeline_semaphore: %i"
 	         "\n\tsynchronization_2: %i",                                //
+	         device_features->buffer_device_address,                     //
 	         device_features->null_descriptor,                           //
 	         device_features->shader_image_gather_extended,              //
 	         device_features->shader_storage_image_write_without_format, //
@@ -1136,23 +1269,28 @@ filter_device_features(struct vk_bundle *vk,
  */
 
 VkResult
-vk_select_physical_device(struct vk_bundle *vk, int forced_index)
+vk_select_physical_device(struct vk_bundle *vk,
+                          bool use_device_group,
+                          const struct vk_physical_device_indices *forced_phys_device)
 {
-	return select_physical_device(vk, forced_index);
+	return use_device_group
+	           ? select_physical_device_group(vk, forced_phys_device)
+	           : select_physical_device(vk, forced_phys_device ? forced_phys_device->device_index : -1);
 }
 
 XRT_CHECK_RESULT VkResult
 vk_create_device(struct vk_bundle *vk,
-                 int forced_index,
                  bool only_compute,
+                 bool use_device_group,
                  VkQueueGlobalPriorityEXT global_priority,
                  struct u_string_list *required_device_ext_list,
                  struct u_string_list *optional_device_ext_list,
-                 const struct vk_device_features *optional_device_features)
+                 const struct vk_device_features *optional_device_features,
+                 const struct vk_physical_device_indices *force_phys_device)
 {
 	VkResult ret;
 
-	ret = select_physical_device(vk, forced_index);
+	ret = vk_select_physical_device(vk, use_device_group, force_phys_device);
 	if (ret != VK_SUCCESS) {
 		return ret;
 	}
@@ -1172,7 +1310,7 @@ vk_create_device(struct vk_bundle *vk,
 	filter_device_features(vk, vk->physical_device, optional_device_features, &device_features);
 	vk->features.timeline_semaphore = device_features.timeline_semaphore;
 	vk->features.synchronization_2 = device_features.synchronization_2;
-
+	vk->features.buffer_device_address = device_features.buffer_device_address;
 
 	/*
 	 * Queue
@@ -1254,6 +1392,16 @@ vk_create_device(struct vk_bundle *vk,
 	};
 #endif
 
+#ifdef VK_KHR_buffer_device_address
+	VkPhysicalDeviceBufferDeviceAddressFeaturesKHR buffer_device_address_info = {
+	    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR,
+	    .pNext = NULL,
+	    .bufferDeviceAddress = device_features.buffer_device_address,
+	    .bufferDeviceAddressCaptureReplay = VK_FALSE,
+	    .bufferDeviceAddressMultiDevice = VK_TRUE,
+	};
+#endif
+
 #ifdef VK_KHR_timeline_semaphore
 	VkPhysicalDeviceTimelineSemaphoreFeaturesKHR timeline_semaphore_info = {
 	    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES_KHR,
@@ -1298,6 +1446,13 @@ vk_create_device(struct vk_bundle *vk,
 	}
 #endif
 
+#ifdef VK_KHR_buffer_device_address
+	if (vk->has_KHR_buffer_device_address) {
+		append_to_pnext_chain((VkBaseInStructure *)&device_create_info,
+		                      (VkBaseInStructure *)&buffer_device_address_info);
+	}
+#endif
+
 #ifdef VK_KHR_timeline_semaphore
 	if (vk->has_KHR_timeline_semaphore) {
 		append_to_pnext_chain((VkBaseInStructure *)&device_create_info,
@@ -1316,6 +1471,19 @@ vk_create_device(struct vk_bundle *vk,
 	if (vk->has_ANDROID_external_format_resolve) {
 		append_to_pnext_chain((VkBaseInStructure *)&device_create_info,
 		                      (VkBaseInStructure *)&ext_fmt_resolve_info);
+	}
+#endif
+
+#ifdef VK_KHR_device_group_creation
+	VkDeviceGroupDeviceCreateInfoKHR device_group_create_info = {
+	    .sType = VK_STRUCTURE_TYPE_DEVICE_GROUP_DEVICE_CREATE_INFO_KHR,
+	    .pNext = NULL,
+	    .physicalDeviceCount = vk->device_group_properties.physicalDeviceCount,
+	    .pPhysicalDevices = vk->device_group_properties.physicalDevices,
+	};
+	if (vk->features.use_device_group) {
+		append_to_pnext_chain((VkBaseInStructure *)&device_create_info,
+		                      (VkBaseInStructure *)&device_group_create_info);
 	}
 #endif
 
