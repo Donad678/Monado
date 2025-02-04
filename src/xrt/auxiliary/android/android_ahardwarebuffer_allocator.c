@@ -60,10 +60,6 @@ swapchain_usage_to_ahardwarebuffer(enum xrt_swapchain_usage_bits bits)
 		ahb_usage |= AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER;
 	}
 
-	if (bits & XRT_SWAPCHAIN_CREATE_PROTECTED_CONTENT) {
-		ahb_usage |= AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT;
-	}
-
 	if (bits & XRT_SWAPCHAIN_USAGE_UNORDERED_ACCESS) {
 		ahb_usage |= AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER;
 	}
@@ -74,6 +70,35 @@ swapchain_usage_to_ahardwarebuffer(enum xrt_swapchain_usage_bits bits)
 	}
 
 	return ahb_usage;
+}
+
+static bool
+ahardwarebuffer_compute_desc(const struct xrt_swapchain_create_info *xsci, AHardwareBuffer_Desc *desc)
+{
+	desc->format = vk_format_to_ahardwarebuffer(xsci->format);
+	if (desc->format == 0) {
+		return false;
+	}
+
+	desc->width = xsci->width;
+	desc->height = xsci->height;
+	desc->layers = xsci->array_size;
+	desc->usage = swapchain_usage_to_ahardwarebuffer(xsci->bits);
+
+	if (xsci->face_count == 6) {
+		desc->usage |= AHARDWAREBUFFER_USAGE_GPU_CUBE_MAP;
+		desc->layers *= 6;
+	}
+
+	if (xsci->mip_count > 1) {
+		desc->usage |= AHARDWAREBUFFER_USAGE_GPU_MIPMAP_COMPLETE;
+	}
+
+	if (xsci->create & XRT_SWAPCHAIN_CREATE_PROTECTED_CONTENT) {
+		desc->usage |= AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT;
+	}
+
+	return true;
 }
 
 bool
