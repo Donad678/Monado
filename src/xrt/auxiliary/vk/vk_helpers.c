@@ -18,6 +18,7 @@
  * @ingroup aux_vk
  */
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1150,6 +1151,17 @@ vk_create_image_from_native(struct vk_bundle *vk,
 	}
 #endif
 
+	uint32_t mip_count = info->mip_count;
+#if defined(XRT_GRAPHICS_BUFFER_HANDLE_IS_AHARDWAREBUFFER)
+	// VUID-VkImageCreateInfo-pNext-02394
+	// mipLevels must either be 1 or equal to the number of levels in the complete mipmap chain
+	if (mip_count > 1) {
+		// ⌊log2(max(extent.width, extent.height, extent.depth))⌋ + 1.
+		// but depth is always 1
+		mip_count = 1 + (uint32_t)log2((info->width > info->height) ? info->width : info->height);
+	}
+#endif
+
 	// In
 	VkImageCreateInfo vk_info = {
 	    .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -1158,7 +1170,7 @@ vk_create_image_from_native(struct vk_bundle *vk,
 	    .imageType = VK_IMAGE_TYPE_2D,
 	    .format = image_format,
 	    .extent = {.width = info->width, .height = info->height, .depth = 1},
-	    .mipLevels = info->mip_count,
+	    .mipLevels = mip_count,
 	    .arrayLayers = info->array_size,
 	    .samples = VK_SAMPLE_COUNT_1_BIT,
 	    .tiling = VK_IMAGE_TILING_OPTIMAL,

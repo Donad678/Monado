@@ -16,6 +16,7 @@
 #include <vulkan/vulkan_core.h>
 #include <xrt/xrt_handles.h>
 
+#include <math.h>
 #ifdef XRT_OS_LINUX
 #include <unistd.h>
 #endif
@@ -237,6 +238,17 @@ create_image(struct vk_bundle *vk, const struct xrt_swapchain_create_info *info,
 		image_create_flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 	}
 
+	uint32_t mip_count = info->mip_count;
+#if defined(XRT_GRAPHICS_BUFFER_HANDLE_IS_AHARDWAREBUFFER)
+	// VUID-VkImageCreateInfo-pNext-02394
+	// mipLevels must either be 1 or equal to the number of levels in the complete mipmap chain
+	if (mip_count > 1) {
+		// ⌊log2(max(extent.width, extent.height, extent.depth))⌋ + 1.
+		// but depth is always 1
+		mip_count = 1 + (uint32_t)log2((info->width > info->height) ? info->width : info->height);
+	}
+#endif
+
 	VkImageCreateInfo create_info = {
 	    .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
 	    .pNext = next_chain,
@@ -244,7 +256,7 @@ create_image(struct vk_bundle *vk, const struct xrt_swapchain_create_info *info,
 	    .imageType = VK_IMAGE_TYPE_2D,
 	    .format = image_format,
 	    .extent = {.width = info->width, .height = info->height, .depth = 1},
-	    .mipLevels = info->mip_count,
+	    .mipLevels = mip_count,
 	    .arrayLayers = info->array_size * info->face_count,
 	    .samples = VK_SAMPLE_COUNT_1_BIT,
 	    .tiling = VK_IMAGE_TILING_OPTIMAL,
