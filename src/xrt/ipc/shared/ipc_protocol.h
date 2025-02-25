@@ -145,6 +145,7 @@ struct ipc_shared_device
 	bool form_factor_check_supported;
 	bool stage_supported;
 	bool battery_status_supported;
+	bool brightness_control_supported;
 	bool planes_supported;
 	enum xrt_plane_detection_capability_flags_ext plane_capability_flags;
 };

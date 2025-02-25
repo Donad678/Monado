@@ -464,6 +464,46 @@ err_mask_unlock:
 	return XRT_ERROR_IPC_FAILURE;
 }
 
+static xrt_result_t
+ipc_client_hmd_get_brightness(struct xrt_device *xdev, float *out_brightness)
+{
+	ipc_client_hmd_t *ich = ipc_client_hmd(xdev);
+	struct ipc_connection *ipc_c = ich->ipc_c;
+	xrt_result_t xret;
+
+	ipc_client_connection_lock(ipc_c);
+
+	xret = ipc_call_device_get_brightness(ipc_c, ich->device_id, out_brightness);
+	IPC_CHK_WITH_GOTO(ipc_c, xret, "ipc_call_device_get_brightness", out);
+
+	ipc_client_connection_unlock(ipc_c);
+	return XRT_SUCCESS;
+
+out:
+	ipc_client_connection_unlock(ipc_c);
+	return XRT_ERROR_IPC_FAILURE;
+}
+
+static xrt_result_t
+ipc_client_hmd_set_brightness(struct xrt_device *xdev, float brightness, bool relative)
+{
+	ipc_client_hmd_t *ich = ipc_client_hmd(xdev);
+	struct ipc_connection *ipc_c = ich->ipc_c;
+	xrt_result_t xret;
+
+	ipc_client_connection_lock(ipc_c);
+
+	xret = ipc_call_device_set_brightness(ipc_c, ich->device_id, brightness, relative);
+	IPC_CHK_WITH_GOTO(ipc_c, xret, "ipc_call_device_set_brightness", out);
+
+	ipc_client_connection_unlock(ipc_c);
+	return XRT_SUCCESS;
+
+out:
+	ipc_client_connection_unlock(ipc_c);
+	return XRT_ERROR_IPC_FAILURE;
+}
+
 /*!
  * @public @memberof ipc_client_hmd
  */
@@ -491,6 +531,8 @@ ipc_client_hmd_create(struct ipc_connection *ipc_c, struct xrt_tracking_origin *
 	ich->base.destroy = ipc_client_hmd_destroy;
 	ich->base.is_form_factor_available = ipc_client_hmd_is_form_factor_available;
 	ich->base.get_visibility_mask = ipc_client_hmd_get_visibility_mask;
+	ich->base.get_brightness = ipc_client_hmd_get_brightness;
+	ich->base.set_brightness = ipc_client_hmd_set_brightness;
 
 	// Start copying the information from the isdev.
 	ich->base.tracking_origin = xtrack;
@@ -552,6 +594,7 @@ ipc_client_hmd_create(struct ipc_connection *ipc_c, struct xrt_tracking_origin *
 	ich->base.form_factor_check_supported = isdev->form_factor_check_supported;
 	ich->base.stage_supported = isdev->stage_supported;
 	ich->base.battery_status_supported = isdev->battery_status_supported;
+	ich->base.brightness_control_supported = isdev->brightness_control_supported;
 	ich->base.planes_supported = isdev->planes_supported;
 	ich->base.plane_capability_flags = isdev->plane_capability_flags;
 
