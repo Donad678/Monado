@@ -983,6 +983,7 @@ compositor_init_renderer(struct comp_compositor *c)
 xrt_result_t
 comp_main_create_system_compositor(struct xrt_device *xdev,
                                    const struct comp_target_factory *ctf,
+                                   struct u_pacing_app_factory *upaf,
                                    struct xrt_system_compositor **out_xsysc)
 {
 	COMP_TRACE_MARKER();
@@ -1183,10 +1184,11 @@ comp_main_create_system_compositor(struct xrt_device *xdev,
 	}
 
 	// Standard app pacer.
-	struct u_pacing_app_factory *upaf = NULL;
-	xrt_result_t xret = u_pa_factory_create(&upaf);
-	assert(xret == XRT_SUCCESS && upaf != NULL);
-	(void)xret;
+	if (upaf == NULL) {
+		xrt_result_t xret = u_pa_factory_create(&upaf);
+		assert(xret == XRT_SUCCESS && upaf != NULL);
+		(void)xret;
+	}
 
 	return comp_multi_create_system_compositor(&c->base.base, upaf, sys_info, !c->deferred_surface, out_xsysc);
 }
