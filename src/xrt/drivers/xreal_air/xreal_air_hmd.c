@@ -1089,17 +1089,22 @@ xreal_air_hmd_get_tracked_pose(struct xrt_device *xdev,
 	const enum xrt_space_relation_flags flags = (enum xrt_space_relation_flags)(
 	    XRT_SPACE_RELATION_ORIENTATION_VALID_BIT | XRT_SPACE_RELATION_ORIENTATION_TRACKED_BIT);
 
-	struct xrt_space_relation relation;
-	U_ZERO(&relation); // Clear out the relation.
+	struct xrt_space_relation relation = XRT_SPACE_RELATION_ZERO;
 	relation.relation_flags = flags;
 
 	m_relation_history_get(hmd->relation_hist, at_timestamp_ns, &relation);
 	relation.relation_flags = flags; // Needed after history_get
 
 	*out_relation = relation;
+	struct xrt_quat *orientation = &out_relation->pose.orientation;
 
 	// Make sure that the orientation is valid.
-	math_quat_normalize(&out_relation->pose.orientation);
+	if (math_quat_dot(orientation, orientation) > 0.0f) {
+		math_quat_normalize(orientation);
+	} else {
+		orientation->w = 1.0f;
+	}
+
 	return XRT_SUCCESS;
 }
 
