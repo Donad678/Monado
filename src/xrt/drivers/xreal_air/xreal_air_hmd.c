@@ -88,6 +88,8 @@ struct xreal_air_hmd
 
 	uint32_t static_id;
 	bool display_on;
+	uint8_t blend_state;
+	uint8_t control_mode;
 	uint8_t imu_stream_state;
 
 	enum u_logging_level log_level;
@@ -735,6 +737,15 @@ handle_control_heartbeat_start(struct xreal_air_hmd *hmd, const struct xreal_air
 }
 
 static void
+handle_control_display_toggled(struct xreal_air_hmd *hmd, const struct xreal_air_parsed_control *control)
+{
+	// State of display
+	const uint8_t display_state = control->data[0];
+
+	hmd->display_on = (display_state != 0);
+}
+
+static void
 handle_control_button(struct xreal_air_hmd *hmd, const struct xreal_air_parsed_control *control)
 {
 	// Physical button
@@ -760,22 +771,54 @@ handle_control_button(struct xreal_air_hmd *hmd, const struct xreal_air_parsed_c
 		hmd->wants.brightness = brightness;
 		break;
 	}
-	case XREAL_AIR_BUTTON_VIRT_MODE_UP: {
+	case XREAL_AIR_BUTTON_VIRT_UP: {
+		switch (hmd->control_mode) {
+			case XREAL_AIR_CONTROL_MODE_BRIGHTNESS: break;
+			case XREAL_AIR_CONTROL_MODE_VOLUME: break;
+			default: {
+				XREAL_AIR_ERROR(hmd, "Got unknown mode increase, 0x%02x (0x%02x)", hmd->control_mode, value);
+				break;
+			}
+		}
+
+		break;
+	}
+	case XREAL_AIR_BUTTON_VIRT_DOWN: {
+		switch (hmd->control_mode) {
+			case XREAL_AIR_CONTROL_MODE_BRIGHTNESS: break;
+			case XREAL_AIR_CONTROL_MODE_VOLUME: break;
+			default: {
+				XREAL_AIR_ERROR(hmd, "Got unknown mode decrease, 0x%02x (0x%02x)", hmd->control_mode, value);
+				break;
+			}
+		}
+
+		break;
+	}
+	case XREAL_AIR_BUTTON_VIRT_MODE_2D: {
 		const uint8_t display_mode = hmd->state.display_mode;
 
-		if (display_mode == XREAL_AIR_DISPLAY_MODE_2D) {
+		if (display_mode != XREAL_AIR_DISPLAY_MODE_2D) {
+			hmd->wants.display_mode = XREAL_AIR_DISPLAY_MODE_2D;
+		}
+
+		break;
+	}
+	case XREAL_AIR_BUTTON_VIRT_MODE_3D: {
+		const uint8_t display_mode = hmd->state.display_mode;
+
+		if (display_mode != XREAL_AIR_DISPLAY_MODE_3D) {
 			hmd->wants.display_mode = XREAL_AIR_DISPLAY_MODE_3D;
 		}
 
 		break;
 	}
-	case XREAL_AIR_BUTTON_VIRT_MODE_DOWN: {
-		const uint8_t display_mode = hmd->state.display_mode;
-
-		if (display_mode == XREAL_AIR_DISPLAY_MODE_3D) {
-			hmd->wants.display_mode = XREAL_AIR_DISPLAY_MODE_2D;
-		}
-
+	case XREAL_AIR_BUTTON_VIRT_BLEND_CYCLE: {
+		hmd->blend_state = value;
+		break;
+	}
+	case XREAL_AIR_BUTTON_VIRT_CONTROL_TOGGLE: {
+		hmd->control_mode = value;
 		break;
 	}
 	default: {
@@ -809,6 +852,7 @@ handle_control_action_locked(struct xreal_air_hmd *hmd, const struct xreal_air_p
 	case XREAL_AIR_MSG_R_DISP_MODE: handle_control_display_mode(hmd, control); break;
 	case XREAL_AIR_MSG_W_DISP_MODE: break;
 	case XREAL_AIR_MSG_P_START_HEARTBEAT: handle_control_heartbeat_start(hmd, control); break;
+	case XREAL_AIR_MSG_P_DISPLAY_TOGGLED: handle_control_display_toggled(hmd, control); break;
 	case XREAL_AIR_MSG_P_BUTTON_PRESSED: handle_control_button(hmd, control); break;
 	case XREAL_AIR_MSG_P_ASYNC_TEXT_LOG: handle_control_async_text(hmd, control); break;
 	case XREAL_AIR_MSG_P_END_HEARTBEAT: handle_control_heartbeat_end(hmd, control); break;
@@ -1165,6 +1209,8 @@ xreal_air_hmd_create_device(struct os_hid_device *sensor_device,
 
 	hmd->static_id = 0;
 	hmd->display_on = false;
+	hmd->blend_state = XREAL_AIR_BLEND_STATE_DEFAULT;
+	hmd->control_mode = XREAL_AIR_CONTROL_MODE_BRIGHTNESS;
 	hmd->imu_stream_state = 0;
 
 	hmd->calibration_buffer = NULL;
