@@ -1,9 +1,9 @@
-// Copyright 2023-2024, Tobias Frisch
+// Copyright 2023-2025, Tobias Frisch
 // SPDX-License-Identifier: BSL-1.0
 /*!
  * @file
  * @brief  Xreal Air packet parsing implementation.
- * @author Tobias Frisch <thejackimonster@gmail.com>
+ * @author Tobias Frisch <jacki@thejackimonster.de>
  * @ingroup drv_xreal_air
  */
 
@@ -19,9 +19,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define XREAL_AIR_HANDLE_IFACE 3
-#define XREAL_AIR_CONTROL_IFACE 4
 
 #define XREAL_AIR_MSG_R_BRIGHTNESS 0x03
 #define XREAL_AIR_MSG_W_BRIGHTNESS 0x04
@@ -147,7 +144,8 @@ struct xreal_air_parsed_control
 struct xrt_device *
 xreal_air_hmd_create_device(struct os_hid_device *sensor_device,
                             struct os_hid_device *control_device,
-                            enum u_logging_level log_level);
+                            enum u_logging_level log_level,
+														uint16_t max_sensor_buffer_size);
 
 bool
 xreal_air_parse_calibration_buffer(struct xreal_air_parsed_calibration *calibration, const char *buffer, size_t size);

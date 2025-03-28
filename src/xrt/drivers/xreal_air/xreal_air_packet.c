@@ -1,9 +1,9 @@
-// Copyright 2023-2024, Tobias Frisch
+// Copyright 2023-2025, Tobias Frisch
 // SPDX-License-Identifier: BSL-1.0
 /*!
  * @file
  * @brief  Xreal Air packet parsing implementation.
- * @author Tobias Frisch <thejackimonster@gmail.com>
+ * @author Tobias Frisch <jacki@thejackimonster.de>
  * @ingroup drv_xreal_air
  */
 

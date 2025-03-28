@@ -1,9 +1,9 @@
-// Copyright 2023-2024, Tobias Frisch
+// Copyright 2023-2025, Tobias Frisch
 // SPDX-License-Identifier: BSL-1.0
 /*!
  * @file
  * @brief  Xreal Air packet parsing implementation.
- * @author Tobias Frisch <thejackimonster@gmail.com>
+ * @author Tobias Frisch <jacki@thejackimonster.de>
  * @ingroup drv_xreal_air
  */
 
@@ -34,7 +34,7 @@
 #define XREAL_AIR_DEBUG(hmd, ...) U_LOG_XDEV_IFL_D(&hmd->base, hmd->log_level, __VA_ARGS__)
 #define XREAL_AIR_ERROR(hmd, ...) U_LOG_XDEV_IFL_E(&hmd->base, hmd->log_level, __VA_ARGS__)
 
-#define SENSOR_BUFFER_SIZE 64
+#define SENSOR_BUFFER_SIZE 512
 #define CONTROL_BUFFER_SIZE 64
 
 #define SENSOR_HEAD 0xFD
@@ -91,6 +91,7 @@ struct xreal_air_hmd
 	uint8_t imu_stream_state;
 
 	enum u_logging_level log_level;
+	uint16_t max_sensor_buffer_size;
 
 	uint32_t calibration_buffer_len;
 	uint32_t calibration_buffer_pos;
@@ -437,8 +438,21 @@ handle_sensor_control_cal_data_get_next_segment(struct xreal_air_hmd *hmd,
 		return;
 	}
 
+	uint16_t data_buffer_size = SENSOR_BUFFER_SIZE;
+
+	if (data_buffer_size > hmd->max_sensor_buffer_size) {
+		data_buffer_size = hmd->max_sensor_buffer_size;
+	}
+
+	if (data_buffer_size <= 8) {
+		XREAL_AIR_ERROR(hmd, "Failed to receive next calibration data from buffer!");
+		return;
+	}
+
+	data_buffer_size -= 8;
+
 	const uint32_t remaining = (hmd->calibration_buffer_len - hmd->calibration_buffer_pos);
-	const uint8_t next = (remaining > 56 ? 56 : remaining);
+	const uint8_t next = (remaining > data_buffer_size ? data_buffer_size : remaining);
 
 	if (hmd->calibration_buffer) {
 		memcpy(hmd->calibration_buffer + hmd->calibration_buffer_pos, data->data, next);
@@ -576,8 +590,13 @@ static void
 sensor_clear_queue(struct xreal_air_hmd *hmd)
 {
 	uint8_t buffer[SENSOR_BUFFER_SIZE];
+	size_t buffer_size = SENSOR_BUFFER_SIZE;
 
-	while (os_hid_read(hmd->hid_sensor, buffer, SENSOR_BUFFER_SIZE, 0) > 0) {
+	if (buffer_size > hmd->max_sensor_buffer_size) {
+		buffer_size = hmd->max_sensor_buffer_size;
+	}
+
+	while (os_hid_read(hmd->hid_sensor, buffer, buffer_size, 0) > 0) {
 		// Just drop the packets.
 	}
 }
@@ -586,8 +605,13 @@ static int
 sensor_read_one_packet(struct xreal_air_hmd *hmd)
 {
 	uint8_t buffer[SENSOR_BUFFER_SIZE];
+	size_t buffer_size = SENSOR_BUFFER_SIZE;
 
-	int size = os_hid_read(hmd->hid_sensor, buffer, SENSOR_BUFFER_SIZE, 0);
+	if (buffer_size > hmd->max_sensor_buffer_size) {
+		buffer_size = hmd->max_sensor_buffer_size;
+	}
+
+	int size = os_hid_read(hmd->hid_sensor, buffer, buffer_size, 0);
 	if (size <= 0) {
 		return size;
 	}
@@ -1104,7 +1128,8 @@ xreal_air_hmd_compute_distortion(
 struct xrt_device *
 xreal_air_hmd_create_device(struct os_hid_device *sensor_device,
                             struct os_hid_device *control_device,
-                            enum u_logging_level log_level)
+                            enum u_logging_level log_level,
+														uint16_t max_sensor_buffer_size)
 {
 	enum u_device_alloc_flags flags =
 	    (enum u_device_alloc_flags)(U_DEVICE_ALLOC_HMD | U_DEVICE_ALLOC_TRACKING_NONE);
@@ -1112,6 +1137,7 @@ xreal_air_hmd_create_device(struct os_hid_device *sensor_device,
 	int ret;
 
 	hmd->log_level = log_level;
+	hmd->max_sensor_buffer_size = max_sensor_buffer_size;
 	hmd->base.update_inputs = xreal_air_hmd_update_inputs;
 	hmd->base.get_tracked_pose = xreal_air_hmd_get_tracked_pose;
 	hmd->base.get_view_poses = u_device_get_view_poses;
