@@ -517,11 +517,11 @@ handle_sensor_control_get_static_id(struct xreal_air_hmd *hmd, const struct xrea
 }
 
 static void
-handle_sensor_control_data_msg(struct xreal_air_hmd *hmd, unsigned char *buffer, int size)
+handle_sensor_control_data_msg(struct xreal_air_hmd *hmd, unsigned char *buffer, size_t size)
 {
 	struct xreal_air_parsed_sensor_control_data data;
 
-	if (!xreal_air_parse_sensor_control_data_packet(&data, buffer, size)) {
+	if (!xreal_air_parse_sensor_control_data_packet(&data, buffer, size, hmd->max_sensor_buffer_size)) {
 		XREAL_AIR_ERROR(hmd, "Could not decode sensor control data packet");
 	}
 
@@ -542,7 +542,7 @@ handle_sensor_control_data_msg(struct xreal_air_hmd *hmd, unsigned char *buffer,
 }
 
 static void
-handle_sensor_msg(struct xreal_air_hmd *hmd, unsigned char *buffer, int size)
+handle_sensor_msg(struct xreal_air_hmd *hmd, unsigned char *buffer, size_t size)
 {
 	if (buffer[0] == 0xAA) {
 		handle_sensor_control_data_msg(hmd, buffer, size);
@@ -618,7 +618,7 @@ sensor_read_one_packet(struct xreal_air_hmd *hmd)
 		return size;
 	}
 
-	handle_sensor_msg(hmd, buffer, size);
+	handle_sensor_msg(hmd, buffer, (size_t) size);
 	return 0;
 }
 

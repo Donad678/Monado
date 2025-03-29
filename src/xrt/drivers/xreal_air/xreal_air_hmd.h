@@ -169,7 +169,8 @@ xreal_air_parse_sensor_packet(struct xreal_air_parsed_sensor *sensor, const uint
 bool
 xreal_air_parse_sensor_control_data_packet(struct xreal_air_parsed_sensor_control_data *data,
                                            const uint8_t *buffer,
-                                           int size);
+                                           size_t size,
+                                           size_t max_size);
 
 bool
 xreal_air_parse_control_packet(struct xreal_air_parsed_control *control, const uint8_t *buffer, int size);

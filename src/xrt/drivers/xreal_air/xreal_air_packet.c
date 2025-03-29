@@ -295,11 +295,12 @@ xreal_air_parse_sensor_packet(struct xreal_air_parsed_sensor *sensor, const uint
 bool
 xreal_air_parse_sensor_control_data_packet(struct xreal_air_parsed_sensor_control_data *data,
                                            const uint8_t *buffer,
-                                           int size)
+                                           size_t size,
+                                           size_t max_size)
 {
 	const uint8_t *start = buffer;
 
-	if (size != 64) {
+	if ((size != max_size) || (size < 8)) {
 		return false;
 	}
 
@@ -316,9 +317,9 @@ xreal_air_parse_sensor_control_data_packet(struct xreal_air_parsed_sensor_contro
 	read_u8(&buffer, &data->msgid);
 
 	// Sensor control data depending on action
-	read_u8_array(&buffer, data->data, 56);
+	read_u8_array(&buffer, data->data, size - 8);
 
-	return (size_t)buffer - (size_t)start == 64;
+	return (size_t)buffer - (size_t)start == max_size;
 }
 
 bool
