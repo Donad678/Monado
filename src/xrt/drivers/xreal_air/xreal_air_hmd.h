@@ -132,7 +132,7 @@ struct xreal_air_parsed_sensor_control_data
 	uint16_t length;
 	uint8_t msgid;
 
-	uint8_t data[56];
+	uint8_t data[512 - 8];
 };
 
 /*!
@@ -164,7 +164,10 @@ bool
 xreal_air_parse_calibration_buffer(struct xreal_air_parsed_calibration *calibration, const char *buffer, size_t size);
 
 bool
-xreal_air_parse_sensor_packet(struct xreal_air_parsed_sensor *sensor, const uint8_t *buffer, int size);
+xreal_air_parse_sensor_packet(struct xreal_air_parsed_sensor *sensor,
+                              const uint8_t *buffer,
+			      size_t size,
+			      size_t max_size);
 
 bool
 xreal_air_parse_sensor_control_data_packet(struct xreal_air_parsed_sensor_control_data *data,

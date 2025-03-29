@@ -394,7 +394,7 @@ static void
 request_sensor_control_start_imu_data(struct xreal_air_hmd *hmd, uint8_t imu_stream_state)
 {
 	// Request to change the imu stream state.
-
+	
 	if (!send_payload_to_sensor(hmd, XREAL_AIR_MSG_START_IMU_DATA, &imu_stream_state, 1)) {
 		XREAL_AIR_ERROR(hmd, "Failed to send payload for changing the imu stream state! %d", imu_stream_state);
 	}
@@ -409,6 +409,7 @@ handle_sensor_control_get_cal_data_length(struct xreal_air_hmd *hmd,
 	    ((data->data[0] << 0u) | (data->data[1] << 8u) | (data->data[2] << 16u) | (data->data[3] << 24u));
 
 	hmd->calibration_buffer_len = calibration_data_length;
+	hmd->calibration_valid = false;
 
 	if (hmd->calibration_buffer_len > 0) {
 		if (hmd->calibration_buffer) {
@@ -429,6 +430,9 @@ static void
 handle_sensor_control_cal_data_get_next_segment(struct xreal_air_hmd *hmd,
                                                 const struct xreal_air_parsed_sensor_control_data *data)
 {
+	if (hmd->calibration_valid) {
+		return;
+	} else
 	if (hmd->calibration_buffer_len == 0) {
 		request_sensor_control_get_cal_data_length(hmd);
 		return;
@@ -454,7 +458,7 @@ handle_sensor_control_cal_data_get_next_segment(struct xreal_air_hmd *hmd,
 	data_buffer_size -= 8;
 
 	const uint32_t remaining = (hmd->calibration_buffer_len - hmd->calibration_buffer_pos);
-	const uint8_t next = (remaining > data_buffer_size ? data_buffer_size : remaining);
+	const uint16_t next = (remaining > data_buffer_size ? data_buffer_size : remaining);
 
 	if (hmd->calibration_buffer) {
 		memcpy(hmd->calibration_buffer + hmd->calibration_buffer_pos, data->data, next);
@@ -469,6 +473,8 @@ handle_sensor_control_cal_data_get_next_segment(struct xreal_air_hmd *hmd,
 		// Parse calibration data from raw json.
 		if (!xreal_air_parse_calibration_buffer(&hmd->calibration, hmd->calibration_buffer,
 		                                        hmd->calibration_buffer_len)) {
+			hmd->calibration_valid = false;
+
 			XREAL_AIR_ERROR(hmd, "Failed parse calibration data!");
 		} else {
 			hmd->calibration_valid = true;
@@ -497,7 +503,7 @@ handle_sensor_control_start_imu_data(struct xreal_air_hmd *hmd, const struct xre
 
 	if (hmd->static_id == 0) {
 		request_sensor_control_get_static_id(hmd);
-	} else if (!hmd->calibration_valid) {
+	} else if ((!hmd->calibration_valid) && (!hmd->calibration_buffer_len)) {
 		request_sensor_control_get_cal_data_length(hmd);
 	}
 }
@@ -511,7 +517,7 @@ handle_sensor_control_get_static_id(struct xreal_air_hmd *hmd, const struct xrea
 
 	hmd->static_id = static_id;
 
-	if (!hmd->calibration_valid) {
+	if ((!hmd->calibration_valid) && (!hmd->calibration_buffer_len)) {
 		request_sensor_control_get_cal_data_length(hmd);
 	}
 }
@@ -552,7 +558,7 @@ handle_sensor_msg(struct xreal_air_hmd *hmd, unsigned char *buffer, size_t size)
 	timepoint_ns now_ns = (timepoint_ns)os_monotonic_get_ns();
 	uint64_t last_timestamp = hmd->last.timestamp;
 
-	if (!xreal_air_parse_sensor_packet(&hmd->last, buffer, size)) {
+	if (!xreal_air_parse_sensor_packet(&hmd->last, buffer, size, hmd->max_sensor_buffer_size)) {
 		XREAL_AIR_ERROR(hmd, "Could not decode sensor packet");
 	} else {
 		hmd->imu_stream_state = 0x1;
@@ -1178,7 +1184,7 @@ struct xrt_device *
 xreal_air_hmd_create_device(struct os_hid_device *sensor_device,
                             struct os_hid_device *control_device,
                             enum u_logging_level log_level,
-														uint16_t max_sensor_buffer_size)
+			    uint16_t max_sensor_buffer_size)
 {
 	enum u_device_alloc_flags flags =
 	    (enum u_device_alloc_flags)(U_DEVICE_ALLOC_HMD | U_DEVICE_ALLOC_TRACKING_NONE);
