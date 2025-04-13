@@ -156,7 +156,7 @@ win:container_prep:
 # Variables for build and usage of Arch image
 .monado.variables.arch:
   variables:
-    FDO_DISTRIBUTION_TAG: "2024-01-16"
+    FDO_DISTRIBUTION_TAG: "2024-12-09"
 
 # Variables for build and usage of Alpine image
 .monado.variables.alpine:
@@ -233,7 +233,7 @@ arch:container_prep:
     - .fdo.container-build@arch # from ci-templates
 
   variables:
-    FDO_DISTRIBUTION_PACKAGES: 'base-devel bc bluez-libs boost check clang cmake diffutils doxygen eigen fmt gcc git glew glfw-x11 glslang glu graphviz gtest gtk3 hidapi libbsd libusb libxrandr mesa meson ninja opencv patch pipewire-jack pkgconfig python-attrs python-setuptools python3 qt6-base v4l-utils vulkan-headers vulkan-icd-loader wayland wget wireplumber'
+    FDO_DISTRIBUTION_PACKAGES: 'base-devel bc bluez-libs boost check clang cmake diffutils doxygen eigen fmt gcc git glew glfw-x11 glslang glu graphviz gtest gtk3 hidapi libbsd libusb libxrandr mesa meson ninja opencv openxr patch pipewire-jack pkgconfig python-attrs python-setuptools python3 qt6-base v4l-utils vulkan-headers vulkan-icd-loader vulkan-swrast wayland weston wget wireplumber'
     FDO_DISTRIBUTION_EXEC: 'env FDO_CI_CONCURRENT=${FDO_CI_CONCURRENT} bash .gitlab-ci/install-arch-additional-deps.sh'
 
 # Make Alpine image
@@ -349,7 +349,7 @@ debian:cmake:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh -DBUILD_DOC=ON
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
   artifacts:
     paths:
       - build/doc/html/
@@ -363,7 +363,7 @@ debian:cmake-no-opencv:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh -DXRT_HAVE_OPENCV=OFF
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 debian:cmake-no-sdl2:
   stage: build
@@ -374,7 +374,7 @@ debian:cmake-no-sdl2:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh -DXRT_HAVE_SDL2=OFF
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 debian:cmake-no-service:
   stage: build
@@ -385,7 +385,7 @@ debian:cmake-no-service:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh -DXRT_FEATURE_SERVICE=OFF
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 debian:cmake:32bit:
   stage: build
@@ -396,7 +396,7 @@ debian:cmake:32bit:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh -DCMAKE_TOOLCHAIN_FILE=.gitlab-ci/i386.cmake -DXRT_HAVE_OPENCV=OFF
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 debian:bullseye:cmake:
   stage: build
@@ -407,7 +407,7 @@ debian:bullseye:cmake:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 ndk:armeabi-v7a:
   stage: build
@@ -559,7 +559,7 @@ ubuntu:jammy:cmake:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 ubuntu:noble:cmake:
   stage: build
@@ -570,7 +570,7 @@ ubuntu:noble:cmake:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 arch:cmake:
   stage: build
@@ -581,7 +581,7 @@ arch:cmake:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 arch:cmake:clang:
   stage: build
@@ -592,7 +592,8 @@ arch:cmake:clang:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
+    - cd build && ../.gitlab-ci/ci_lvp_hello_xr_test.sh && cd ..
 
 alpine:cmake:
   stage: build
@@ -603,7 +604,7 @@ alpine:cmake:
 
     - .gitlab-ci/prebuild.sh
     - .gitlab-ci/ci-cmake-build.sh
-    - cd build && ctest --output-on-failure
+    - cd build && ctest --output-on-failure && cd ..
 
 # Windows build
 windows:
