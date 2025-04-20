@@ -15,6 +15,7 @@
 #include "xrt/xrt_plane_detector.h"
 #include "xrt/xrt_visibility_mask.h"
 #include "xrt/xrt_limits.h"
+#include "xrt/xrt_frameserver.h"
 
 #include <stdalign.h>
 
@@ -600,6 +601,17 @@ struct xrt_device
 	xrt_result_t (*end_feature)(struct xrt_device *xdev, enum xrt_device_feature_type type);
 
 	/*!
+	 * Get the frameservers this xdev exposes. You're expected to free the result of out_frameservers.
+	 *
+	 * @param[in] xdev	The device.
+	 * @param[out] out_frameservers	The returned frameservers.
+	 * @param[out] num_frameservers The amount of frameservers returned.
+	 */
+	xrt_result_t (*get_frameservers)(struct xrt_device *xdev,
+	                                 struct xrt_fs ***out_frameservers,
+	                                 size_t *num_frameservers);
+
+	/*!
 	 * Destroy device.
 	 */
 	void (*destroy)(struct xrt_device *xdev);
@@ -879,6 +891,23 @@ static inline xrt_result_t
 xrt_device_end_feature(struct xrt_device *xdev, enum xrt_device_feature_type type)
 {
 	return xdev->end_feature(xdev, type);
+}
+
+/*!
+ * Helper function for @ref xrt_device::get_frameservers.
+ *
+ * @copydoc xrt_device::get_frameservers
+ *
+ * @public @memberof xrt_device
+ */
+static inline xrt_result_t
+xrt_device_get_frameservers(struct xrt_device *xdev, struct xrt_fs ***out_frameservers, size_t *num_frameservers)
+{
+	if (!xdev->get_frameservers) {
+		return XRT_ERROR_NOT_IMPLEMENTED;
+	}
+
+	return xdev->get_frameservers(xdev, out_frameservers, num_frameservers);
 }
 
 /*!
