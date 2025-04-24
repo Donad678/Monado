@@ -44,7 +44,7 @@
  * probably want 3, but most compositors on Linux sets the minImageCount
  * to 3 anyways so we get what we want.
  */
-DEBUG_GET_ONCE_NUM_OPTION(preferred_at_least_image_count, "XRT_COMPOSITOR_PERFERED_IMAGE_COUNT", 2)
+DEBUG_GET_ONCE_NUM_OPTION(preferred_at_least_image_count, "XRT_COMPOSITOR_PREFERRED_IMAGE_COUNT", 2)
 
 static inline struct vk_bundle *
 get_vk(struct comp_target_swapchain *cts)
