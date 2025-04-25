@@ -415,7 +415,9 @@ struct xrt_device
 	 * @param[in] value          The value to set the output to.
 	 * @see xrt_output_name
 	 */
-	void (*set_output)(struct xrt_device *xdev, enum xrt_output_name name, const union xrt_output_value *value);
+	xrt_result_t (*set_output)(struct xrt_device *xdev,
+	                           enum xrt_output_name name,
+	                           const union xrt_output_value *value);
 
 	/*!
 	 * Begin a plane detection request
@@ -707,10 +709,11 @@ xrt_device_get_body_joints(struct xrt_device *xdev,
  *
  * @public @memberof xrt_device
  */
-static inline void
+static inline xrt_result_t
 xrt_device_set_output(struct xrt_device *xdev, enum xrt_output_name name, const union xrt_output_value *value)
 {
 	xdev->set_output(xdev, name, value);
+	return XRT_SUCCESS;
 }
 
 /*!
