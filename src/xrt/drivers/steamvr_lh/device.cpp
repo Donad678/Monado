@@ -164,6 +164,65 @@ device_bouncer(struct xrt_device *xdev, Args... args)
 }
 } // namespace
 
+Property::Property(vr::PropertyTypeTag_t tag, void *buffer, uint32_t bufferSize)
+{
+	this->buffer = nullptr;
+	this->tag = tag;
+	this->buffer = new char[bufferSize];
+	this->bufferSize = bufferSize;
+	std::memcpy(this->buffer, buffer, bufferSize);
+}
+
+Property::Property(const Property &other)
+{
+	this->tag = other.tag;
+	this->bufferSize = other.bufferSize;
+	this->buffer = new char[bufferSize];
+	std::memcpy(this->buffer, other.buffer, bufferSize);
+}
+
+vr::ETrackedPropertyError
+Property::set(vr::PropertyTypeTag_t tag, void *buffer, uint32_t bufferSize)
+{
+	if (tag != this->tag) {
+		// not verified with SteamVR
+		return vr::ETrackedPropertyError::TrackedProp_WrongDataType;
+	}
+	this->tag = tag;
+	// this could be improved by checking if the new buffer could fit in the current one
+	if (this->buffer) {
+		delete[] this->buffer;
+	}
+	this->buffer = new char[bufferSize];
+	this->bufferSize = bufferSize;
+	std::memcpy(this->buffer, buffer, bufferSize);
+
+	return vr::ETrackedPropertyError::TrackedProp_Success;
+}
+
+vr::ETrackedPropertyError
+Property::get(vr::PropertyTypeTag_t *tag, void *buffer, uint32_t bufferSize, uint32_t *requiredBufferSize)
+{
+	*tag = this->tag;
+	*requiredBufferSize = this->bufferSize;
+	if (!this->buffer) {
+		// should never happen, but better catch it
+		return vr::ETrackedPropertyError::TrackedProp_NotYetAvailable;
+	}
+	std::memcpy(buffer, this->buffer, std::min(bufferSize, this->bufferSize));
+	if (bufferSize >= this->bufferSize) {
+		return vr::ETrackedPropertyError::TrackedProp_Success;
+	}
+	return vr::ETrackedPropertyError::TrackedProp_BufferTooSmall;
+}
+
+Property::~Property()
+{
+	if (buffer) {
+		delete[] buffer;
+	}
+}
+
 HmdDevice::HmdDevice(const DeviceBuilder &builder) : Device(builder)
 {
 	this->name = XRT_DEVICE_GENERIC_HMD;
@@ -718,6 +777,18 @@ Device::handle_properties(const vr::PropertyWrite_t *batch, uint32_t count)
 	}
 }
 
+vr::ETrackedPropertyError
+Device::handle_property_reads(vr::PropertyRead_t *batch, uint32_t count)
+{
+	for (uint32_t i = 0; i < count; ++i) {
+		vr::ETrackedPropertyError err = handle_generic_property_read(batch[i]);
+		if (err != vr::ETrackedPropertyError::TrackedProp_Success) {
+			return err;
+		}
+	}
+	return vr::ETrackedPropertyError::TrackedProp_Success;
+}
+
 void
 HmdDevice::set_nominal_frame_interval(uint64_t interval_ns)
 {
@@ -750,9 +821,43 @@ parse_profile(std::string_view path)
 }
 } // namespace
 
+vr::ETrackedPropertyError
+Device::handle_generic_property_write(const vr::PropertyWrite_t &prop)
+{
+	switch (prop.writeType) {
+	case vr::EPropertyWriteType::PropertyWrite_Set:
+		if (properties.count(prop.prop) > 0) {
+			return properties.at(prop.prop).set(prop.unTag, prop.pvBuffer, prop.unBufferSize);
+		} else {
+			properties.emplace(std::piecewise_construct, std::forward_as_tuple(prop.prop),
+			                   std::forward_as_tuple(prop.unTag, prop.pvBuffer, prop.unBufferSize));
+		}
+		break;
+	case vr::EPropertyWriteType::PropertyWrite_Erase: properties.erase(prop.prop); break;
+	case vr::EPropertyWriteType::PropertyWrite_SetError:
+		DEV_DEBUG("Property write type SetError not supported! (property %d)", prop.prop);
+		break;
+	}
+	return vr::ETrackedPropertyError::TrackedProp_Success;
+}
+
+vr::ETrackedPropertyError
+Device::handle_generic_property_read(vr::PropertyRead_t &prop)
+{
+	if (properties.count(prop.prop) == 0) {
+		// not verified if this is the correct error
+		return vr::ETrackedPropertyError::TrackedProp_UnknownProperty;
+	}
+	auto err =
+	    properties.at(prop.prop).get(&prop.unTag, prop.pvBuffer, prop.unBufferSize, &prop.unRequiredBufferSize);
+	prop.eError = err;
+	return err;
+}
+
 void
 Device::handle_property_write(const vr::PropertyWrite_t &prop)
 {
+	handle_generic_property_write(prop);
 	switch (prop.prop) {
 	case vr::Prop_ManufacturerName_String: {
 		this->manufacturer = std::string(static_cast<char *>(prop.pvBuffer), prop.unBufferSize);
@@ -780,6 +885,7 @@ Device::handle_property_write(const vr::PropertyWrite_t &prop)
 void
 HmdDevice::handle_property_write(const vr::PropertyWrite_t &prop)
 {
+	handle_generic_property_write(prop);
 	switch (prop.prop) {
 	case vr::Prop_DisplayFrequency_Float: {
 		assert(prop.unBufferSize == sizeof(float));
@@ -825,6 +931,7 @@ HmdDevice::handle_property_write(const vr::PropertyWrite_t &prop)
 void
 ControllerDevice::handle_property_write(const vr::PropertyWrite_t &prop)
 {
+	handle_generic_property_write(prop);
 	switch (prop.prop) {
 	case vr::Prop_InputProfilePath_String: {
 		std::string_view profile =

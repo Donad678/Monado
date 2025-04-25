@@ -44,6 +44,24 @@ struct DeviceBuilder
 	operator=(const DeviceBuilder &) = delete;
 };
 
+//
+class Property
+{
+public:
+	Property(vr::PropertyTypeTag_t tag, void *buffer, uint32_t bufferSize);
+	Property(const Property &other);
+	~Property();
+	vr::ETrackedPropertyError
+	set(vr::PropertyTypeTag_t tag, void *buffer, uint32_t bufferSize);
+	vr::ETrackedPropertyError
+	get(vr::PropertyTypeTag_t *tag, void *buffer, uint32_t bufferSize, uint32_t *requiredBufferSize);
+
+private:
+	vr::PropertyTypeTag_t tag;
+	char *buffer;
+	uint32_t bufferSize;
+};
+
 class Device : public xrt_device
 {
 
@@ -68,6 +86,9 @@ public:
 	void
 	handle_properties(const vr::PropertyWrite_t *batch, uint32_t count);
 
+	vr::ETrackedPropertyError
+	handle_property_reads(vr::PropertyRead_t *batch, uint32_t count);
+
 	//! Maps to @ref xrt_device::get_tracked_pose.
 	virtual xrt_result_t
 	get_tracked_pose(xrt_input_name name, uint64_t at_timestamp_ns, xrt_space_relation *out_relation) = 0;
@@ -79,6 +100,7 @@ protected:
 	Device(const DeviceBuilder &builder);
 	std::shared_ptr<Context> ctx;
 	vr::PropertyContainerHandle_t container_handle{0};
+	std::unordered_map<vr::ETrackedDeviceProperty, Property> properties;
 	std::unordered_map<std::string_view, xrt_input *> inputs_map;
 	std::vector<xrt_input> inputs_vec;
 	inline static xrt_pose chaperone = XRT_POSE_IDENTITY;
@@ -89,6 +111,11 @@ protected:
 	bool provides_battery_status{false};
 	bool charging{false};
 	float charge{1.0F};
+
+	vr::ETrackedPropertyError
+	handle_generic_property_write(const vr::PropertyWrite_t &prop);
+	vr::ETrackedPropertyError
+	handle_generic_property_read(vr::PropertyRead_t &prop);
 
 	virtual void
 	handle_property_write(const vr::PropertyWrite_t &prop);
