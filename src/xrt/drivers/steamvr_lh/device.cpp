@@ -473,8 +473,9 @@ ControllerDevice::set_output(xrt_output_name name, const xrt_output_value *value
 	// 0.0f in OpenXR means let the driver determine a frequency, but
 	// in OpenVR means no haptic, so let's set a reasonable default.
 	float frequency = vib.frequency;
-	if (frequency == 0.0)
+	if (frequency == 0.0) {
 		frequency = 200.0f;
+	}
 
 	event.fFrequency = frequency;
 	event.fAmplitude = vib.amplitude;
