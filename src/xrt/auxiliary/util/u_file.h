@@ -1,4 +1,4 @@
-// Copyright 2019-2020, Collabora, Ltd.
+// Copyright 2019-2025, Collabora, Ltd.
 // SPDX-License-Identifier: BSL-1.0
 /*!
  * @file
@@ -9,15 +9,11 @@
 
 #pragma once
 
-#include "xrt/xrt_compiler.h"
-
 #include <stdio.h>
-
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 
 ssize_t
 u_file_get_config_dir(char *out_path, size_t out_path_size);
