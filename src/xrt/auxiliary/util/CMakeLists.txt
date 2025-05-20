@@ -168,6 +168,7 @@ endif()
 
 # Internal dependency and doesn't bring in any DSO.
 target_include_directories(aux_util PRIVATE ${EIGEN3_INCLUDE_DIR})
+target_link_libraries(aux_util PUBLIC CxxAtomics::atomic_uint_fast64_t)
 
 ####
 # Debug UI library
