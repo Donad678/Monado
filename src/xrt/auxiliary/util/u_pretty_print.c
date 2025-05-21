@@ -173,6 +173,9 @@ u_pp_xrt_result(struct u_pp_delegate dg, xrt_result_t xret)
 	case XRT_ERROR_ANDROID:                              DG("XRT_ERROR_ANDROID"); return;
 	case XRT_ERROR_FEATURE_NOT_SUPPORTED:                DG("XRT_ERROR_FEATURE_NOT_SUPPORTED"); return;
 	case XRT_ERROR_INPUT_UNSUPPORTED:                    DG("XRT_ERROR_INPUT_UNSUPPORTED"); return;
+	case XRT_ERROR_SYNC_PRIMITIVE_CREATION_FAILED:       DG("XRT_ERROR_SYNC_PRIMITIVE_CREATION_FAILED"); return;
+	case XRT_ERROR_IPC_SERVICE_ALREADY_RUNNING:          DG("XRT_ERROR_IPC_SERVICE_ALREADY_RUNNING"); return;
+	case XRT_ERROR_IPC_MAINLOOP_FAILED_TO_INIT:          DG("XRT_ERROR_IPC_MAINLOOP_FAILED_TO_INIT"); return;
 	}
 	// clang-format on
 
