@@ -359,6 +359,7 @@ init_shm(struct ipc_server *s)
 		isdev->body_tracking_supported = xdev->body_tracking_supported;
 		isdev->stage_supported = xdev->stage_supported;
 		isdev->battery_status_supported = xdev->battery_status_supported;
+		isdev->brightness_control_supported = xdev->brightness_control_supported;
 		isdev->planes_supported = xdev->planes_supported;
 		isdev->plane_capability_flags = xdev->plane_capability_flags;
 

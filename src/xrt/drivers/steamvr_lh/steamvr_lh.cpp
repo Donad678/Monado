@@ -112,7 +112,7 @@ Context::create(const std::string &steam_install,
 }
 
 Context::Context(const std::string &steam_install, const std::string &steamvr_install, u_logging_level level)
-    : settings(steam_install, steamvr_install), resources(level, steamvr_install), log_level(level)
+    : settings(steam_install, steamvr_install, this), resources(level, steamvr_install), log_level(level)
 {}
 
 Context::~Context()
@@ -343,7 +343,16 @@ Context::VendorSpecificEvent(uint32_t unWhichDevice,
                              vr::EVREventType eventType,
                              const vr::VREvent_Data_t &eventData,
                              double eventTimeOffset)
-{}
+{
+	std::lock_guard lk(event_queue_mut);
+	events.push_back({std::chrono::steady_clock::now(),
+	                  {
+	                      .eventType = eventType,
+	                      .trackedDeviceIndex = unWhichDevice,
+	                      .eventAgeSeconds = {},
+	                      .data = eventData,
+	                  }});
+}
 
 bool
 Context::IsExiting()

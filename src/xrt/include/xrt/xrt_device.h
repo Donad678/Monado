@@ -294,6 +294,7 @@ struct xrt_device
 	bool face_tracking_supported;
 	bool body_tracking_supported;
 	bool battery_status_supported;
+	bool brightness_control_supported;
 	bool planes_supported;
 	enum xrt_plane_detection_capability_flags_ext plane_capability_flags;
 
@@ -601,6 +602,27 @@ struct xrt_device
 	                                   float *out_charge);
 
 	/*!
+	 * @brief Get the current display brightness.
+	 *
+	 * @param[in] xdev             The device.
+	 * @param[out] out_brightness  Current display brightness. Usually between 0 and 1. Some devices may
+	 *                             exceed 1 if the supported range exceeds 100%
+	 */
+	xrt_result_t (*get_brightness)(struct xrt_device *xdev, float *out_brightness);
+
+	/*!
+	 * @brief Set the display brightness.
+	 *
+	 * @param[in] xdev            The device.
+	 * @param[in] brightness      Desired display brightness. Usually between 0 and 1. Some devices may
+	 *                            allow exceeding 1 if the supported range exceeds 100%, but it will be clamped to
+	 *                            the supported range.
+	 * @param[in] relative        Whether to add \a brightness to the current brightness, instead of overwriting
+	 *                            the current brightness.
+	 */
+	xrt_result_t (*set_brightness)(struct xrt_device *xdev, float brightness, bool relative);
+
+	/*!
 	 * Enable the feature for this device.
 	 *
 	 * @param[in] xdev        The device.
@@ -880,6 +902,30 @@ static inline xrt_result_t
 xrt_device_get_battery_status(struct xrt_device *xdev, bool *out_present, bool *out_charging, float *out_charge)
 {
 	return xdev->get_battery_status(xdev, out_present, out_charging, out_charge);
+}
+
+/*!
+ * Helper function for @ref xrt_device::get_brightness.
+ *
+ * @copydoc xrt_device::get_brightness
+ * @public @memberof xrt_device
+ */
+static inline xrt_result_t
+xrt_device_get_brightness(struct xrt_device *xdev, float *out_brightness)
+{
+	return xdev->get_brightness(xdev, out_brightness);
+}
+
+/*!
+ * Helper function for @ref xrt_device::set_brightness.
+ *
+ * @copydoc xrt_device::set_brightness
+ * @public @memberof xrt_device
+ */
+static inline xrt_result_t
+xrt_device_set_brightness(struct xrt_device *xdev, float brightness, bool relative)
+{
+	return xdev->set_brightness(xdev, brightness, relative);
 }
 
 /*!
