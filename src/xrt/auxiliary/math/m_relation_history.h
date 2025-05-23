@@ -48,7 +48,7 @@ enum m_relation_history_result
  * @public @memberof m_relation_history
  */
 void
-m_relation_history_create(struct m_relation_history **rh);
+m_relation_history_create(struct m_relation_history **rh, bool filtered_motion_vectors);
 
 /*!
  * Pushes a new pose to the history.
@@ -159,7 +159,7 @@ private:
 
 public:
 	// clang-format off
-	RelationHistory() noexcept { m_relation_history_create(&mPtr); }
+	RelationHistory(bool filtered_motion_vectors) noexcept { m_relation_history_create(&mPtr, filtered_motion_vectors); }
 	~RelationHistory() { m_relation_history_destroy(&mPtr); }
 	// clang-format on
 
