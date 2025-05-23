@@ -206,13 +206,18 @@ ipc_client_socket_connect(struct ipc_connection *ipc_c)
 static bool
 ipc_client_socket_connect(struct ipc_connection *ipc_c)
 {
+#ifdef SOCK_CLOEXEC
+	const int flags = SOCK_CLOEXEC;
+#else
+	const int flags = 0;
+#endif
 	struct sockaddr_un addr;
 	int ret;
 
 
 	// create our IPC socket
 
-	ret = socket(PF_UNIX, SOCK_STREAM, 0);
+	ret = socket(PF_UNIX, SOCK_STREAM | flags, 0);
 	if (ret < 0) {
 		IPC_ERROR(ipc_c, "Socket Create Error!");
 		return false;
