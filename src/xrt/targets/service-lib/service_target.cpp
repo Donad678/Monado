@@ -1,4 +1,5 @@
 // Copyright 2020, Collabora, Ltd.
+// Copyright 2024, Collabora, Ltd.
 // SPDX-License-Identifier: BSL-1.0
 /*!
  * @file
@@ -41,10 +42,11 @@ public:
 	}
 
 	void
-	signalStartupComplete()
+	signalStartupComplete(ipc_server *s)
 	{
 		std::unique_lock<std::mutex> lock{server_mutex};
 		startup_complete = true;
+		server = s;
 		startup_cond.notify_all();
 	}
 
@@ -53,15 +55,27 @@ public:
 	{
 		std::unique_lock lock(server_mutex);
 		if (!server && !server_thread) {
-			server_thread = std::make_unique<std::thread>(
-			    [&]() { ipc_server_main_android(&server, signalStartupCompleteTrampoline, this); });
+			server_thread =
+			    std::make_unique<std::thread>([&]() { ipc_server_main_common(&ismc, &callbacks, this); });
 		}
 	}
 
 	static void
-	signalStartupCompleteTrampoline(void *data)
+	signalInitFailed(xrt_result_t xret, void *data)
 	{
-		static_cast<IpcServerHelper *>(data)->signalStartupComplete();
+		static_cast<IpcServerHelper *>(data)->signalStartupComplete(nullptr);
+	}
+
+	static void
+	signalStartupCompleteTrampoline(ipc_server *s, xrt_instance *xsint, void *data)
+	{
+		static_cast<IpcServerHelper *>(data)->signalStartupComplete(s);
+	}
+
+	static void
+	signalShuttingDownTrampoline(ipc_server *s, xrt_instance *xsint, void *data)
+	{
+		// No-op
 	}
 
 	int32_t
@@ -113,6 +127,20 @@ private:
 		}
 		return server && completed;
 	}
+
+	struct ipc_server_main_info ismi = {
+	    .udgci =
+	        {
+	            .window_title = "Monado Android Service",
+	            .open = U_DEBUG_GUI_OPEN_NEVER,
+	        },
+	};
+
+	struct ipc_server_main_callbacks callbacks = {
+	    .init_failed = signalInitFailed,
+	    .mainloop_entering = signalStartupCompleteTrampoline,
+	    .mainloop_left = signalShuttingDownTrampoline,
+	};
 
 	//! Reference to the ipc_server, managed by ipc_server_process
 	struct ipc_server *server = NULL;

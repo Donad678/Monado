@@ -103,7 +103,7 @@ teardown_idev(struct ipc_device *idev)
 	idev->io_active = false;
 }
 
-static int
+static void
 init_idevs(struct ipc_server *s)
 {
 	// Copy the devices over into the idevs array.
@@ -114,8 +114,6 @@ init_idevs(struct ipc_server *s)
 
 		init_idev(&s->idevs[i], s->xsysd->xdevs[i]);
 	}
-
-	return 0;
 }
 
 static void
@@ -217,7 +215,7 @@ teardown_all(struct ipc_server *s)
 	os_mutex_destroy(&s->global_state.lock);
 }
 
-static int
+static void
 init_tracking_origins(struct ipc_server *s)
 {
 	for (size_t i = 0; i < XRT_SYSTEM_MAX_DEVICES; i++) {
@@ -240,8 +238,6 @@ init_tracking_origins(struct ipc_server *s)
 			}
 		}
 	}
-
-	return 0;
 }
 
 static void
@@ -284,15 +280,14 @@ handle_binding(struct ipc_shared_memory *ism,
 	*output_pair_index_ptr = output_pair_index;
 }
 
-static int
+XRT_CHECK_RESULT static xrt_result_t
 init_shm(struct ipc_server *s)
 {
 	const size_t size = sizeof(struct ipc_shared_memory);
 	xrt_shmem_handle_t handle;
-	xrt_result_t result = ipc_shmem_create(size, &handle, (void **)&s->ism);
-	if (result != XRT_SUCCESS) {
-		return -1;
-	}
+
+	xrt_result_t xret = ipc_shmem_create(size, &handle, (void **)&s->ism);
+	IPC_CHK_AND_RET(s, xret, "ipc_shmem_create");
 
 	// we have a filehandle, we will pass this to our client
 	s->ism_handle = handle;
@@ -446,7 +441,7 @@ init_shm(struct ipc_server *s)
 	// Fill out git version info.
 	snprintf(s->ism->u_git_tag, IPC_VERSION_NAME_LEN, "%s", u_git_tag);
 
-	return 0;
+	return XRT_SUCCESS;
 }
 
 static void
@@ -466,10 +461,10 @@ init_server_state(struct ipc_server *s)
 	}
 }
 
-static int
+static xrt_result_t
 init_all(struct ipc_server *s, enum u_logging_level log_level)
 {
-	xrt_result_t xret;
+	xrt_result_t xret = XRT_SUCCESS;
 	int ret;
 
 	// First order of business set the log level.
@@ -480,16 +475,15 @@ init_all(struct ipc_server *s, enum u_logging_level log_level)
 	if (ret < 0) {
 		IPC_ERROR(s, "Global state lock mutex failed to init!");
 		// Do not call teardown_all here, os_mutex_destroy will assert.
-		return ret;
+		return XRT_ERROR_SYNC_PRIMITIVE_CREATION_FAILED;
 	}
 
 	s->process = u_process_create_if_not_running();
-
 	if (!s->process) {
 		IPC_ERROR(s, "monado-service is already running! Use XRT_LOG=trace for more information.");
-		teardown_all(s);
-		return 1;
+		xret = XRT_ERROR_IPC_SERVICE_ALREADY_RUNNING;
 	}
+	IPC_CHK_WITH_GOTO(s, xret, "u_process_create_if_not_running", error);
 
 	// Yes we should be running.
 	s->running = true;
@@ -500,46 +494,23 @@ init_all(struct ipc_server *s, enum u_logging_level log_level)
 	s->exit_when_idle_delay_ns = delay_ms * U_TIME_1MS_IN_NS;
 
 	xret = xrt_instance_create(NULL, &s->xinst);
-	if (xret != XRT_SUCCESS) {
-		IPC_ERROR(s, "Failed to create instance!");
-		teardown_all(s);
-		return -1;
-	}
+	IPC_CHK_WITH_GOTO(s, xret, "xrt_instance_create", error);
 
 	xret = xrt_instance_create_system(s->xinst, &s->xsys, &s->xsysd, &s->xso, &s->xsysc);
-	if (xret != XRT_SUCCESS) {
-		IPC_ERROR(s, "Could not create system!");
-		teardown_all(s);
-		return -1;
-	}
+	IPC_CHK_WITH_GOTO(s, xret, "xrt_instance_create_system", error);
 
-	ret = init_idevs(s);
-	if (ret < 0) {
-		IPC_ERROR(s, "Failed to init idevs!");
-		teardown_all(s);
-		return ret;
-	}
+	// Always succeeds.
+	init_idevs(s);
+	init_tracking_origins(s);
 
-	ret = init_tracking_origins(s);
-	if (ret < 0) {
-		IPC_ERROR(s, "Failed to init tracking origins!");
-		teardown_all(s);
-		return ret;
-	}
-
-	ret = init_shm(s);
-	if (ret < 0) {
-		IPC_ERROR(s, "Could not init shared memory!");
-		teardown_all(s);
-		return ret;
-	}
+	xret = init_shm(s);
+	IPC_CHK_WITH_GOTO(s, xret, "init_shm", error);
 
 	ret = ipc_server_mainloop_init(&s->ml);
 	if (ret < 0) {
-		IPC_ERROR(s, "Failed to init ipc main loop!");
-		teardown_all(s);
-		return ret;
+		xret = XRT_ERROR_IPC_MAINLOOP_FAILED_TO_INIT;
 	}
+	IPC_CHK_WITH_GOTO(s, xret, "ipc_server_mainloop_init", error);
 
 	// Never fails, do this second last.
 	init_server_state(s);
@@ -551,7 +522,12 @@ init_all(struct ipc_server *s, enum u_logging_level log_level)
 	u_var_add_u64(s, &s->exit_when_idle_delay_ns, "exit_when_idle_delay_ns");
 	u_var_add_bool(s, (bool *)&s->running, "running");
 
-	return 0;
+	return XRT_SUCCESS;
+
+error:
+	teardown_all(s);
+
+	return xret;
 }
 
 static int
@@ -1002,10 +978,14 @@ ipc_server_get_system_properties(struct ipc_server *vs, struct xrt_system_proper
 	return XRT_SUCCESS;
 }
 
-#ifndef XRT_OS_ANDROID
 int
-ipc_server_main(int argc, char **argv, const struct ipc_server_main_info *ismi)
+ipc_server_main_common(const struct ipc_server_main_info *ismi,
+                       const struct ipc_server_callbacks *callbacks,
+                       void *data)
 {
+	xrt_result_t xret = XRT_SUCCESS;
+	int ret = -1;
+
 	// Get log level first.
 	enum u_logging_level log_level = debug_get_log_option_ipc_log();
 
@@ -1026,28 +1006,27 @@ ipc_server_main(int argc, char **argv, const struct ipc_server_main_info *ismi)
 	 */
 	u_debug_gui_create(&ismi->udgci, &s->debug_gui);
 
-
-	int ret = init_all(s, log_level);
-	if (ret < 0) {
-#ifdef XRT_OS_LINUX
-		// Print information how to debug issues.
-		print_linux_end_user_failed_information(log_level);
-#endif
-
+	xret = init_all(s, log_level);
+	U_LOG_CHK_ONLY_PRINT(log_level, xret, "init_all");
+	if (xret != XRT_SUCCESS) {
+		// Propegate the failure.
+		callbacks->init_failed(xret, data);
 		u_debug_gui_stop(&s->debug_gui);
 		free(s);
-		return ret;
+		return -1;
 	}
 
 	// Start the debug UI now (if enabled).
 	u_debug_gui_start(s->debug_gui, s->xinst, s->xsysd);
 
-#ifdef XRT_OS_LINUX
-	// Print a very clear service started message.
-	print_linux_end_user_started_information(log_level);
-#endif
+	// Tell the callbacks we are entering the main-loop.
+	callbacks->mainloop_entering(s, s->xinst, data);
+
 	// Main loop.
 	ret = main_loop(s);
+
+	// Tell the callbacks we are leaving the main-loop.
+	callbacks->mainloop_left(s, s->xinst, data);
 
 	// Stop the UI before tearing everything down.
 	u_debug_gui_stop(&s->debug_gui);
@@ -1065,35 +1044,43 @@ ipc_server_main(int argc, char **argv, const struct ipc_server_main_info *ismi)
 	return ret;
 }
 
-#endif // !XRT_OS_ANDROID
 
-#ifdef XRT_OS_ANDROID
-int
-ipc_server_main_android(struct ipc_server **ps, void (*startup_complete_callback)(void *data), void *data)
+#ifndef XRT_OS_ANDROID
+
+void
+init_failed(xrt_result_t xret, void *data)
 {
-	// Get log level first.
-	enum u_logging_level log_level = debug_get_log_option_ipc_log();
-
-	struct ipc_server *s = U_TYPED_CALLOC(struct ipc_server);
-	U_LOG_D("Created IPC server!");
-
-	int ret = init_all(s, log_level);
-	if (ret < 0) {
-		free(s);
-		startup_complete_callback(data);
-		return ret;
-	}
-
-	*ps = s;
-	startup_complete_callback(data);
-
-	ret = main_loop(s);
-
-	teardown_all(s);
-	free(s);
-
-	U_LOG_I("Server exiting '%i'!", ret);
-
-	return ret;
+#ifdef XRT_OS_LINUX
+	// Print information how to debug issues.
+	print_linux_end_user_failed_information(debug_get_log_option_ipc_log());
+#endif
 }
-#endif // XRT_OS_ANDROID
+
+void
+mainloop_entering(struct ipc_server *s, struct xrt_instance *xinst, void *data)
+{
+#ifdef XRT_OS_LINUX
+	// Print a very clear service started message.
+	print_linux_end_user_started_information(s->log_level);
+#endif
+}
+
+void
+mainloop_left(struct ipc_server *s, struct xrt_instance *xinst, void *data)
+{
+	// No-op
+}
+
+int
+ipc_server_main(int argc, char **argv, const struct ipc_server_main_info *ismi)
+{
+	struct ipc_server_callbacks callbacks = {
+	    .init_failed = init_failed,
+	    .mainloop_entering = mainloop_entering,
+	    .mainloop_left = mainloop_left,
+	};
+
+	return ipc_server_main_common(ismi, &callbacks, NULL);
+}
+
+#endif // !XRT_OS_ANDROID
