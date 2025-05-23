@@ -141,7 +141,9 @@ m_filter_euro_f32_run(struct m_filter_euro_f32 *f, uint64_t ts, const float *in_
 		f->prev_dy = 0;
 		f->prev_y = *in_y;
 
-		*out_y = *in_y;
+		if (out_y) {
+			*out_y = *in_y;
+		}
 		return;
 	}
 
@@ -156,7 +158,9 @@ m_filter_euro_f32_run(struct m_filter_euro_f32 *f, uint64_t ts, const float *in_
 	double dy_mag = fabs(f->prev_dy);
 	double alpha = filter_one_euro_compute_alpha(&f->base, dt, dy_mag);
 
-	*out_y = f->prev_y = exp_smooth(alpha, *in_y, f->prev_y);
+	if (out_y) {
+		*out_y = f->prev_y = exp_smooth(alpha, *in_y, f->prev_y);
+	}
 }
 
 void
@@ -173,7 +177,9 @@ m_filter_euro_vec2_run(struct m_filter_euro_vec2 *f, uint64_t ts, const struct x
 		/* First sample - no filtering yet */
 		U_ZERO(&f->prev_dy);
 		f->prev_y = *in_y;
-		*out_y = *in_y;
+		if (out_y) {
+			*out_y = *in_y;
+		}
 		return;
 	}
 
@@ -188,7 +194,9 @@ m_filter_euro_vec2_run(struct m_filter_euro_vec2 *f, uint64_t ts, const struct x
 
 	/* Smooth the dy values and use them to calculate the frequency cutoff for the main filter */
 	f->prev_y = exp_smooth_vec2(alpha, *in_y, f->prev_y);
-	*out_y = f->prev_y;
+	if (out_y) {
+		*out_y = f->prev_y;
+	}
 }
 
 void
@@ -201,7 +209,9 @@ m_filter_euro_vec2_run_no_commit(struct m_filter_euro_vec2 *f,
 	if (filter_one_euro_handle_first_sample(&f->base, ts, false)) {
 		// First sample - no filtering yet - and we're not committing anything to the filter so return right
 		// away
-		*out_y = *in_y;
+		if (out_y) {
+			*out_y = *in_y;
+		}
 		return;
 	}
 
@@ -215,7 +225,9 @@ m_filter_euro_vec2_run_no_commit(struct m_filter_euro_vec2 *f,
 
 	/* Smooth the dy values and use them to calculate the frequency cutoff for the main filter */
 	double alpha = filter_one_euro_compute_alpha(&f->base, dt, dy_mag);
-	*out_y = exp_smooth_vec2(alpha, *in_y, f->prev_y);
+	if (out_y) {
+		*out_y = exp_smooth_vec2(alpha, *in_y, f->prev_y);
+	}
 }
 
 
@@ -233,7 +245,9 @@ m_filter_euro_vec3_run(struct m_filter_euro_vec3 *f, uint64_t ts, const struct x
 		U_ZERO(&f->prev_dy);
 		f->prev_y = *in_y;
 
-		*out_y = *in_y;
+		if (out_y) {
+			*out_y = *in_y;
+		}
 		return;
 	}
 
@@ -248,7 +262,9 @@ m_filter_euro_vec3_run(struct m_filter_euro_vec3 *f, uint64_t ts, const struct x
 
 	/* Smooth the dy values and use them to calculate the frequency cutoff for the main filter */
 	f->prev_y = exp_smooth_vec3(alpha, *in_y, f->prev_y);
-	*out_y = f->prev_y;
+	if (out_y) {
+		*out_y = f->prev_y;
+	}
 }
 
 //! @todo fix order of args
@@ -266,7 +282,9 @@ m_filter_euro_quat_run(struct m_filter_euro_quat *f, uint64_t ts, const struct x
 		f->prev_dy = (struct xrt_quat)XRT_QUAT_IDENTITY;
 		f->prev_y = *in_y;
 
-		*out_y = *in_y;
+		if (out_y) {
+			*out_y = *in_y;
+		}
 		return;
 	}
 
@@ -293,5 +311,7 @@ m_filter_euro_quat_run(struct m_filter_euro_quat *f, uint64_t ts, const struct x
 
 	/* Smooth the dy values and use them to calculate the frequency cutoff for the main filter */
 	f->prev_y = exp_smooth_quat(alpha, *in_y, f->prev_y);
-	*out_y = f->prev_y;
+	if (out_y) {
+		*out_y = f->prev_y;
+	}
 }
