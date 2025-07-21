@@ -12,14 +12,17 @@
 
 #include "m_relation_history.h"
 
+#include "xrt/xrt_defines.h"
+
 #include "math/m_api.h"
 #include "math/m_predict.h"
 #include "math/m_vec3.h"
+
 #include "os/os_time.h"
+#include "os/os_threading.h"
+
 #include "util/u_logging.h"
 #include "util/u_trace_marker.h"
-#include "xrt/xrt_defines.h"
-#include "os/os_threading.h"
 #include "util/u_template_historybuf.hpp"
 
 #include <memory>

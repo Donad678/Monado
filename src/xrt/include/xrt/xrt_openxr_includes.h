@@ -62,8 +62,10 @@ typedef __eglMustCastToProperFunctionPointerType (*PFNEGLGETPROCADDRESSPROC)(con
 #include "openxr/openxr.h"                    // IWYU pragma: export
 #include "openxr/openxr_platform.h"           // IWYU pragma: export
 #include "openxr/openxr_loader_negotiation.h" // IWYU pragma: export
+#include "openxr/openxr_reflection.h"         // IWYU pragma: export
 
 #include "openxr/XR_MNDX_hydra.h"
 #include "openxr/XR_MNDX_xdev_space.h"
 #include "openxr/XR_MNDX_system_buttons.h"
 #include "openxr/XR_MNDX_ball_on_a_stick_controller.h"
+#include "openxr/XR_MNDX_oculus_remote.h"

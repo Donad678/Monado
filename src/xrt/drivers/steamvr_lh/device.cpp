@@ -7,12 +7,14 @@
  * @ingroup drv_steamvr_lh
  */
 
+#include <cmath>
 #include <functional>
 #include <cstring>
 #include <numbers>
 #include <openvr_driver.h>
 #include <thread>
 #include <algorithm>
+#include <map>
 
 #include "math/m_api.h"
 #include "math/m_relation_history.h"
@@ -29,6 +31,7 @@
 #include "xrt/xrt_device.h"
 
 #include "vive/vive_poses.h"
+#include "openvr_driver.h"
 
 #define DEV_ERR(...) U_LOG_IFL_E(ctx->log_level, __VA_ARGS__)
 #define DEV_WARN(...) U_LOG_IFL_W(ctx->log_level, __VA_ARGS__)
@@ -208,9 +211,11 @@ HmdDevice::HmdDevice(const DeviceBuilder &builder) : Device(builder)
 	this->inputs = inputs_vec.data();
 	this->input_count = inputs_vec.size();
 
+	this->xrt_device::get_view_poses = &device_bouncer<HmdDevice, &HmdDevice::get_view_poses, xrt_result_t>;
 #define SETUP_MEMBER_FUNC(name) this->xrt_device::name = &device_bouncer<HmdDevice, &HmdDevice::name>
-	SETUP_MEMBER_FUNC(get_view_poses);
 	SETUP_MEMBER_FUNC(compute_distortion);
+	SETUP_MEMBER_FUNC(set_brightness);
+	SETUP_MEMBER_FUNC(get_brightness);
 #undef SETUP_MEMBER_FUNC
 }
 
@@ -239,12 +244,13 @@ Device::Device(const DeviceBuilder &builder) : xrt_device({}), ctx(builder.ctx),
 	std::strncpy(this->serial, builder.serial, XRT_DEVICE_NAME_LEN - 1);
 	this->serial[XRT_DEVICE_NAME_LEN - 1] = 0;
 	this->tracking_origin = ctx.get();
-	this->orientation_tracking_supported = true;
-	this->position_tracking_supported = true;
-	this->hand_tracking_supported = true;
-	this->force_feedback_supported = false;
-	this->form_factor_check_supported = false;
-	this->battery_status_supported = true;
+	this->supported.orientation_tracking = true;
+	this->supported.position_tracking = true;
+	this->supported.hand_tracking = true;
+	this->supported.force_feedback = false;
+	this->supported.form_factor_check = false;
+	this->supported.battery_status = true;
+	this->supported.brightness_control = true;
 
 	this->xrt_device::update_inputs = &device_bouncer<Device, &Device::update_inputs, xrt_result_t>;
 #define SETUP_MEMBER_FUNC(name) this->xrt_device::name = &device_bouncer<Device, &Device::name>
@@ -589,6 +595,27 @@ Device::get_battery_status(bool *out_present, bool *out_charging, float *out_cha
 }
 
 xrt_result_t
+HmdDevice::get_brightness(float *out_brightness)
+{
+	*out_brightness = this->brightness;
+	return XRT_SUCCESS;
+}
+
+xrt_result_t
+HmdDevice::set_brightness(float brightness, bool relative)
+{
+	constexpr auto min_brightness = 0.2f;
+	constexpr auto max_brightness = 1.5f;
+
+	const auto target_brightness = relative ? (this->brightness + brightness) : brightness;
+	this->brightness = std::clamp(target_brightness, min_brightness, max_brightness);
+	const auto analog_gain =
+	    std::clamp(brightness_to_analog_gain(this->brightness), analog_gain_range.min, analog_gain_range.max);
+	ctx->settings.SetFloat(vr::k_pch_SteamVR_Section, analog_gain_settings_key, analog_gain);
+	return XRT_SUCCESS;
+}
+
+xrt_result_t
 HmdDevice::get_tracked_pose(xrt_input_name name, uint64_t at_timestamp_ns, xrt_space_relation *out_relation)
 {
 	switch (name) {
@@ -631,23 +658,29 @@ ControllerDevice::get_tracked_pose(xrt_input_name name, uint64_t at_timestamp_ns
 	return XRT_SUCCESS;
 }
 
-void
+xrt_result_t
 ControllerDevice::set_output(xrt_output_name name, const xrt_output_value *value)
 
 {
 	const auto &vib = value->vibration;
 	if (vib.amplitude == 0.0)
-		return;
+		return XRT_SUCCESS;
 	vr::VREvent_HapticVibration_t event;
 	event.containerHandle = container_handle;
 	event.componentHandle = haptic_handle;
 	event.fDurationSeconds = (float)vib.duration_ns / 1e9f;
 	// 0.0f in OpenXR means let the driver determine a frequency, but
-	// in OpenVR means no haptic.
-	event.fFrequency = std::max(vib.frequency, 1.0f);
+	// in OpenVR means no haptic, so let's set a reasonable default.
+	float frequency = vib.frequency;
+	if (frequency == 0.0) {
+		frequency = 200.0f;
+	}
+
+	event.fFrequency = frequency;
 	event.fAmplitude = vib.amplitude;
 
 	ctx->add_haptic_event(event);
+	return XRT_SUCCESS;
 }
 
 void
@@ -685,7 +718,7 @@ HmdDevice::SetDisplayEyeToHead(uint32_t unWhichDevice,
 	this->eye[1].position = rightEye_postquat.position;
 }
 
-void
+xrt_result_t
 HmdDevice::get_view_poses(const xrt_vec3 *default_eye_relation,
                           uint64_t at_timestamp_ns,
                           uint32_t view_count,
@@ -696,14 +729,17 @@ HmdDevice::get_view_poses(const xrt_vec3 *default_eye_relation,
 	struct xrt_vec3 eye_relation = *default_eye_relation;
 	eye_relation.x = ipd;
 
-	u_device_get_view_poses( //
-	    this,                //
-	    &eye_relation,       //
-	    at_timestamp_ns,     //
-	    view_count,          //
-	    out_head_relation,   //
-	    out_fovs,            //
-	    out_poses);          //
+	xrt_result_t xret = u_device_get_view_poses( //
+	    this,                                    //
+	    &eye_relation,                           //
+	    at_timestamp_ns,                         //
+	    view_count,                              //
+	    out_head_relation,                       //
+	    out_fovs,                                //
+	    out_poses);                              //
+	if (xret != XRT_SUCCESS) {
+		return xret;
+	}
 
 	out_poses[0].orientation = this->eye[0].orientation;
 	out_poses[0].position.z = this->eye[0].position.z;
@@ -711,6 +747,8 @@ HmdDevice::get_view_poses(const xrt_vec3 *default_eye_relation,
 	out_poses[1].orientation = this->eye[1].orientation;
 	out_poses[1].position.z = this->eye[1].position.z;
 	out_poses[1].position.y = this->eye[1].position.y;
+
+	return XRT_SUCCESS;
 }
 
 bool
@@ -985,6 +1023,18 @@ HmdDevice::handle_property_write(const vr::PropertyWrite_t &prop)
 		float bat = *static_cast<float *>(prop.pvBuffer);
 		this->charge = bat;
 		DEV_DEBUG("Battery: HMD: %f", bat);
+		break;
+	}
+	case vr::Prop_DisplaySupportsAnalogGain_Bool: {
+		this->supported.brightness_control = *static_cast<bool *>(prop.pvBuffer);
+		break;
+	}
+	case vr::Prop_DisplayMinAnalogGain_Float: {
+		this->analog_gain_range.min = *static_cast<float *>(prop.pvBuffer);
+		break;
+	}
+	case vr::Prop_DisplayMaxAnalogGain_Float: {
+		this->analog_gain_range.max = *static_cast<float *>(prop.pvBuffer);
 		break;
 	}
 	default: {

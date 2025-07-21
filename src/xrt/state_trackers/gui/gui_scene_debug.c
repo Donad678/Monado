@@ -1,4 +1,5 @@
 // Copyright 2019-2024, Collabora, Ltd.
+// Copyright 2024-2025, NVIDIA CORPORATION.
 // SPDX-License-Identifier: BSL-1.0
 /*!
  * @file
@@ -38,6 +39,8 @@
 #include "imgui_monado/cimgui_monado.h"
 
 #include <float.h>
+#include <inttypes.h>
+
 
 /*
  *
@@ -375,6 +378,34 @@ on_pose(const char *name, void *ptr)
 }
 
 static void
+on_ro_i64_ns(const char *name, void *ptr)
+{
+	const ImGuiInputTextFlags ro_i_flags = ImGuiInputTextFlags_ReadOnly;
+
+	// Display in a more readable format.
+	double time = time_ns_to_ms_f(*(int64_t *)ptr);
+
+	igBeginGroup();
+	igPushID_Str(name);
+	igPushMultiItemsWidths(2, igCalcItemWidth());
+
+	igPushID_Int(0);
+	igInputScalar("", ImGuiDataType_Double, &time, NULL, NULL, "%+.3f ms", ro_i_flags);
+	igPopItemWidth();
+	igPopID();
+
+	igSameLine(0, 4.0f);
+
+	igPushID_Int(1);
+	igInputScalar(name, ImGuiDataType_U64, ptr, NULL, NULL, "%" PRIu64 " ns", ro_i_flags);
+	igPopItemWidth();
+	igPopID();
+
+	igPopID();
+	igEndGroup();
+}
+
+static void
 on_ff_vec3_var(struct u_var_info *info, struct gui_program *p)
 {
 	char tmp[512];
@@ -659,12 +690,14 @@ on_elem(struct u_var_info *info, void *priv)
 	case U_VAR_KIND_LOG_LEVEL: igCombo_Str(name, (int *)ptr, "Trace\0Debug\0Info\0Warn\0Error\0\0", 5); break;
 	case U_VAR_KIND_RO_TEXT: igText("%s: '%s'", name, (char *)ptr); break;
 	case U_VAR_KIND_RO_FTEXT: igText(ptr ? (char *)ptr : "%s", name); break;
+	case U_VAR_KIND_RO_I16: igInputScalar(name, ImGuiDataType_S16, ptr, NULL, NULL, NULL, ro_i_flags); break;
 	case U_VAR_KIND_RO_I32: igInputScalar(name, ImGuiDataType_S32, ptr, NULL, NULL, NULL, ro_i_flags); break;
 	case U_VAR_KIND_RO_U32: igInputScalar(name, ImGuiDataType_U32, ptr, NULL, NULL, NULL, ro_i_flags); break;
 	case U_VAR_KIND_RO_F32: igInputScalar(name, ImGuiDataType_Float, ptr, NULL, NULL, "%+f", ro_i_flags); break;
 	case U_VAR_KIND_RO_I64: igInputScalar(name, ImGuiDataType_S64, ptr, NULL, NULL, NULL, ro_i_flags); break;
 	case U_VAR_KIND_RO_U64: igInputScalar(name, ImGuiDataType_S64, ptr, NULL, NULL, NULL, ro_i_flags); break;
 	case U_VAR_KIND_RO_F64: igInputScalar(name, ImGuiDataType_Double, ptr, NULL, NULL, "%+f", ro_i_flags); break;
+	case U_VAR_KIND_RO_I64_NS: on_ro_i64_ns(name, ptr); break;
 	case U_VAR_KIND_RO_VEC3_I32: igInputInt3(name, (int *)ptr, ro_i_flags); break;
 	case U_VAR_KIND_RO_VEC3_F32: igInputFloat3(name, (float *)ptr, "%+f", ro_i_flags); break;
 	case U_VAR_KIND_RO_QUAT_F32: igInputFloat4(name, (float *)ptr, "%+f", ro_i_flags); break;

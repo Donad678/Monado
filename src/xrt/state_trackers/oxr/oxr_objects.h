@@ -177,6 +177,20 @@ typedef XrResult (*oxr_handle_destroyer)(struct oxr_logger *log, struct oxr_hand
 	} while (false)
 
 
+static inline const char *
+xr_action_type_to_str(XrActionType type)
+{
+	// clang-format off
+		switch (type) {
+	#define PRINT(name, value) \
+		case name: return #name;
+		XR_LIST_ENUM_XrActionType(PRINT)
+	#undef PRINT
+		default: return "XR_ACTION_TYPE_UNKNOWN";
+		}
+	// clang-format on
+}
+
 /*
  *
  * oxr_handle_base.c
@@ -637,7 +651,7 @@ oxr_find_profile_for_device(struct oxr_logger *log,
                             struct xrt_device *xdev,
                             struct oxr_interaction_profile **out_p);
 
-void
+bool
 oxr_get_profile_for_device_name(struct oxr_logger *log,
                                 struct oxr_session *sess,
                                 enum xrt_device_name name,
@@ -667,12 +681,12 @@ oxr_session_binding_destroy_all(struct oxr_logger *log, struct oxr_session *sess
  * @public @memberof oxr_interaction_profile
  */
 void
-oxr_binding_find_bindings_from_key(struct oxr_logger *log,
-                                   struct oxr_interaction_profile *p,
-                                   uint32_t key,
-                                   size_t max_bounding_count,
-                                   struct oxr_binding **bindings,
-                                   size_t *out_binding_count);
+oxr_binding_find_bindings_from_act_key(struct oxr_logger *log,
+                                       struct oxr_interaction_profile *profile,
+                                       uint32_t key,
+                                       size_t max_binding_count,
+                                       struct oxr_binding **out_bindings,
+                                       size_t *out_binding_count);
 
 /*!
  * @public @memberof oxr_instance
@@ -1087,6 +1101,9 @@ oxr_system_get_face_tracking2_fb_support(struct oxr_logger *log,
 bool
 oxr_system_get_body_tracking_fb_support(struct oxr_logger *log, struct oxr_instance *inst);
 
+bool
+oxr_system_get_full_body_tracking_meta_support(struct oxr_logger *log, struct oxr_instance *inst);
+
 /*
  *
  * oxr_event.cpp
@@ -1167,18 +1184,6 @@ oxr_xdev_find_input(struct xrt_device *xdev, enum xrt_input_name name, struct xr
  */
 bool
 oxr_xdev_find_output(struct xrt_device *xdev, enum xrt_output_name name, struct xrt_output **out_output);
-
-/*!
- * Returns the hand tracking value of the named input from the device.
- * Does NOT apply tracking origin offset to each joint.
- */
-void
-oxr_xdev_get_hand_tracking_at(struct oxr_logger *log,
-                              struct oxr_instance *inst,
-                              struct xrt_device *xdev,
-                              enum xrt_input_name name,
-                              XrTime at_time,
-                              struct xrt_hand_joint_set *out_value);
 
 #ifdef OXR_HAVE_MNDX_xdev_space
 static inline XrXDevListMNDX
@@ -1496,7 +1501,6 @@ struct oxr_system
 	//! Have the client application called the gfx api requirements func?
 	bool gotten_requirements;
 
-	XrFormFactor form_factor;
 	XrViewConfigurationType view_config_type;
 	XrViewConfigurationView views[2];
 	uint32_t blend_mode_count;
@@ -1551,8 +1555,11 @@ static inline struct xrt_device *get_role_head(struct oxr_system *sys) {return s
 static inline struct xrt_device *get_role_eyes(struct oxr_system *sys) {return sys->xsysd->static_roles.eyes; }
 static inline struct xrt_device *get_role_face(struct oxr_system* sys) { return sys->xsysd->static_roles.face; }
 static inline struct xrt_device *get_role_body(struct oxr_system* sys) { return sys->xsysd->static_roles.body; }
-static inline struct xrt_device *get_role_hand_tracking_left(struct oxr_system* sys) { return sys->xsysd->static_roles.hand_tracking.left; }
-static inline struct xrt_device *get_role_hand_tracking_right(struct oxr_system* sys) { return sys->xsysd->static_roles.hand_tracking.right; }
+static inline struct xrt_device *get_role_hand_tracking_unobstructed_left(struct oxr_system* sys) { return sys->xsysd->static_roles.hand_tracking.unobstructed.left; }
+static inline struct xrt_device *get_role_hand_tracking_unobstructed_right(struct oxr_system* sys) { return sys->xsysd->static_roles.hand_tracking.unobstructed.right; }
+static inline struct xrt_device *get_role_hand_tracking_conforming_left(struct oxr_system* sys) { return sys->xsysd->static_roles.hand_tracking.conforming.left; }
+static inline struct xrt_device *get_role_hand_tracking_conforming_right(struct oxr_system* sys) { return sys->xsysd->static_roles.hand_tracking.conforming.right; }
+
 // clang-format on
 
 // dynamic roles
@@ -1597,12 +1604,23 @@ get_role_profile_body(struct oxr_system *sys)
 	return XRT_DEVICE_INVALID;
 }
 static inline enum xrt_device_name
-get_role_profile_hand_tracking_left(struct oxr_system *sys)
+get_role_profile_hand_tracking_unobstructed_left(struct oxr_system *sys)
 {
 	return XRT_DEVICE_INVALID;
 }
 static inline enum xrt_device_name
-get_role_profile_hand_tracking_right(struct oxr_system *sys)
+get_role_profile_hand_tracking_unobstructed_right(struct oxr_system *sys)
+{
+	return XRT_DEVICE_INVALID;
+}
+
+static inline enum xrt_device_name
+get_role_profile_hand_tracking_conforming_left(struct oxr_system *sys)
+{
+	return XRT_DEVICE_INVALID;
+}
+static inline enum xrt_device_name
+get_role_profile_hand_tracking_conforming_right(struct oxr_system *sys)
 {
 	return XRT_DEVICE_INVALID;
 }
@@ -2032,8 +2050,8 @@ struct oxr_binding
 
 	enum oxr_subaction_path subaction_path;
 
-	uint32_t key_count;
-	uint32_t *keys;
+	uint32_t act_key_count;
+	uint32_t *act_keys;
 	//! store which entry in paths was suggested, for each action key
 	uint32_t *preferred_binding_path_index;
 
@@ -2627,6 +2645,28 @@ struct oxr_debug_messenger
 	void *XR_MAY_ALIAS user_data;
 };
 
+struct oxr_hand_tracking_data_source
+{
+	//! xrt_device backing this hand tracker
+	struct xrt_device *xdev;
+
+	//! the input name associated with this hand tracker
+	enum xrt_input_name input_name;
+};
+
+static inline int
+oxr_hand_tracking_data_source_cmp(const void *p1, const void *p2)
+{
+	const struct oxr_hand_tracking_data_source *lhs = (const struct oxr_hand_tracking_data_source *)p1;
+	const struct oxr_hand_tracking_data_source *rhs = (const struct oxr_hand_tracking_data_source *)p2;
+	assert(lhs && rhs);
+	if (rhs->input_name < lhs->input_name)
+		return -1;
+	if (rhs->input_name > lhs->input_name)
+		return 1;
+	return 0;
+}
+
 /*!
  * A hand tracker.
  *
@@ -2644,11 +2684,19 @@ struct oxr_hand_tracker
 	//! Owner of this hand tracker.
 	struct oxr_session *sess;
 
-	//! xrt_device backing this hand tracker
-	struct xrt_device *xdev;
+	struct oxr_hand_tracking_data_source unobstructed;
+	struct oxr_hand_tracking_data_source conforming;
 
-	//! the input name associated with this hand tracker
-	enum xrt_input_name input_name;
+	/*!
+	 * An ordered list of requested data-source from above options (@ref
+	 * oxr_hand_tracker::[unobstructed|conforming]), ordered by
+	 * @ref oxr_hand_tracker::input_name (see @ref oxr_hand_tracking_data_source_cmp)
+	 *
+	 * if OXR_HAVE_EXT_hand_tracking_data_source is not defined the list
+	 * will contain refs to all the above options.
+	 */
+	const struct oxr_hand_tracking_data_source *requested_sources[2];
+	uint32_t requested_sources_count;
 
 	XrHandEXT hand;
 	XrHandJointSetEXT hand_joint_set;
@@ -2905,6 +2953,11 @@ struct oxr_plane_detector_ext
 	uint64_t detection_id;
 };
 #endif // OXR_HAVE_EXT_plane_detection
+
+#ifdef OXR_HAVE_EXT_user_presence
+XrResult
+oxr_event_push_XrEventDataUserPresenceChangedEXT(struct oxr_logger *log, struct oxr_session *sess, bool isUserPresent);
+#endif // OXR_HAVE_EXT_user_presence
 
 /*!
  * @}

@@ -622,8 +622,9 @@ lighthouse_open_system_impl(struct xrt_builder *xb,
 	int head_idx = -1;
 	int left_idx = -1;
 	int right_idx = -1;
+	int gamepad_idx = -1;
 
-	u_device_assign_xdev_roles(xsysd->xdevs, xsysd->xdev_count, &head_idx, &left_idx, &right_idx);
+	u_device_assign_xdev_roles(xsysd->xdevs, xsysd->xdev_count, &head_idx, &left_idx, &right_idx, &gamepad_idx);
 
 	if (head_idx < 0) {
 		LH_ERROR("Unable to find HMD");
@@ -634,7 +635,8 @@ lighthouse_open_system_impl(struct xrt_builder *xb,
 	// Devices to populate.
 	struct xrt_device *head = NULL;
 	struct xrt_device *left = NULL, *right = NULL;
-	struct xrt_device *left_ht = NULL, *right_ht = NULL;
+	struct xrt_device *unobstructed_left_ht = NULL, *unobstructed_right_ht = NULL;
+	struct xrt_device *conforming_left_ht = NULL, *conforming_right_ht = NULL;
 
 	// Always have a head.
 	head = xsysd->xdevs[head_idx];
@@ -643,13 +645,15 @@ lighthouse_open_system_impl(struct xrt_builder *xb,
 	if (left_idx >= 0) {
 		lhs->vive_tstatus.controllers_found = true;
 		left = xsysd->xdevs[left_idx];
-		left_ht = u_system_devices_get_ht_device_left(xsysd);
+		unobstructed_left_ht = u_system_devices_get_ht_device_unobstructed_left(xsysd);
+		conforming_left_ht = u_system_devices_get_ht_device_conforming_left(xsysd);
 	}
 
 	if (right_idx >= 0) {
 		lhs->vive_tstatus.controllers_found = true;
 		right = xsysd->xdevs[right_idx];
-		right_ht = u_system_devices_get_ht_device_right(xsysd);
+		unobstructed_right_ht = u_system_devices_get_ht_device_unobstructed_right(xsysd);
+		conforming_right_ht = u_system_devices_get_ht_device_conforming_right(xsysd);
 	}
 
 	if (lhs->is_valve_index) {
@@ -707,13 +711,13 @@ lighthouse_open_system_impl(struct xrt_builder *xb,
 			if (hand_devices[0] != NULL) {
 				xsysd->xdevs[xsysd->xdev_count++] = hand_devices[0];
 				left = hand_devices[0];
-				left_ht = hand_devices[0];
+				unobstructed_left_ht = hand_devices[0];
 			}
 
 			if (hand_devices[1] != NULL) {
 				xsysd->xdevs[xsysd->xdev_count++] = hand_devices[1];
 				right = hand_devices[1];
-				right_ht = hand_devices[1];
+				unobstructed_right_ht = hand_devices[1];
 			}
 		}
 
@@ -733,15 +737,17 @@ end_valve_index:
 	// Should we use OpenGloves.
 	if (!lhs->vive_tstatus.hand_enabled) {
 		// We only want to try to add opengloves if we aren't optically tracking hands
-		try_add_opengloves(left, right, &left_ht, &right_ht);
+		try_add_opengloves(left, right, &unobstructed_left_ht, &unobstructed_right_ht);
 	}
 
 	// Assign to role(s).
 	ubrh->head = head;
 	ubrh->left = left;
 	ubrh->right = right;
-	ubrh->hand_tracking.left = left_ht;
-	ubrh->hand_tracking.right = right_ht;
+	ubrh->hand_tracking.unobstructed.left = unobstructed_left_ht;
+	ubrh->hand_tracking.unobstructed.right = unobstructed_right_ht;
+	ubrh->hand_tracking.conforming.left = conforming_left_ht;
+	ubrh->hand_tracking.conforming.right = conforming_right_ht;
 
 	// Clean up after us.
 	lhs->xfctx = NULL;
